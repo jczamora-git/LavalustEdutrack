@@ -1,0 +1,224 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+All colors MUST be HSL.
+*/
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 220 15% 20%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 220 15% 20%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 15% 20%;
+
+    --primary: 220 80% 45%;
+    --primary-foreground: 0 0% 100%;
+    
+    --primary-hover: 220 80% 40%;
+    --primary-glow: 220 80% 65%;
+
+    --secondary: 220 15% 95%;
+    --secondary-foreground: 220 80% 45%;
+
+    --muted: 220 15% 96%;
+    --muted-foreground: 220 10% 50%;
+
+    --accent: 180 70% 50%;
+    --accent-foreground: 0 0% 100%;
+    
+    --success: 142 71% 45%;
+    --success-foreground: 0 0% 100%;
+    
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 15% 88%;
+    --input: 220 15% 88%;
+    --ring: 220 80% 45%;
+
+    --radius: 0.75rem;
+    
+    --gradient-primary: linear-gradient(135deg, hsl(220 80% 45%) 0%, hsl(180 70% 50%) 100%);
+    --gradient-hero: linear-gradient(180deg, hsl(220 80% 98%) 0%, hsl(0 0% 100%) 100%);
+    --shadow-elevated: 0 10px 40px -10px hsl(220 80% 45% / 0.15);
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+    --sidebar-background: 220 80% 45%;
+    --sidebar-foreground: 0 0% 100%;
+    --sidebar-primary: 0 0% 100%;
+    --sidebar-primary-foreground: 220 80% 45%;
+    --sidebar-accent: 220 80% 40%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 220 80% 40%;
+    --sidebar-ring: 180 70% 50%;
+    
+    /* Table colors for grade inputs */
+    --table-written: 220 80% 97%;
+    --table-written-border: 220 80% 90%;
+    --table-performance: 142 50% 95%;
+    --table-performance-border: 142 50% 85%;
+    --table-exam: 38 50% 95%;
+    --table-exam-border: 38 50% 85%;
+    --table-total: 180 50% 95%;
+    --table-total-border: 180 50% 85%;
+  }
+
+  .dark {
+    --background: 220 25% 8%;
+    --foreground: 0 0% 95%;
+
+    --card: 220 25% 12%;
+    --card-foreground: 0 0% 95%;
+
+    --popover: 220 25% 12%;
+    --popover-foreground: 0 0% 95%;
+
+    --primary: 220 80% 55%;
+    --primary-foreground: 0 0% 100%;
+    
+    --primary-hover: 220 80% 50%;
+    --primary-glow: 220 80% 70%;
+
+    --secondary: 220 20% 20%;
+    --secondary-foreground: 0 0% 95%;
+
+    --muted: 220 20% 18%;
+    --muted-foreground: 220 10% 65%;
+
+    --accent: 180 70% 55%;
+    --accent-foreground: 0 0% 100%;
+    
+    --success: 142 71% 50%;
+    --success-foreground: 0 0% 100%;
+    
+    --warning: 38 92% 55%;
+    --warning-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 65%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 20% 25%;
+    --input: 220 20% 25%;
+    --ring: 220 80% 55%;
+    
+    --gradient-primary: linear-gradient(135deg, hsl(220 80% 55%) 0%, hsl(180 70% 55%) 100%);
+    --gradient-hero: linear-gradient(180deg, hsl(220 25% 12%) 0%, hsl(220 25% 8%) 100%);
+    --shadow-elevated: 0 10px 40px -10px hsl(220 80% 55% / 0.3);
+
+    --sidebar-background: 220 25% 10%;
+    --sidebar-foreground: 0 0% 95%;
+    --sidebar-primary: 220 80% 55%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 25% 18%;
+    --sidebar-accent-foreground: 0 0% 95%;
+    --sidebar-border: 220 20% 25%;
+    --sidebar-ring: 180 70% 55%;
+    
+    /* Table colors for grade inputs - dark mode */
+    --table-written: 220 50% 15%;
+    --table-written-border: 220 50% 25%;
+    --table-performance: 142 30% 15%;
+    --table-performance-border: 142 30% 25%;
+    --table-exam: 38 30% 15%;
+    --table-exam-border: 38 30% 25%;
+    --table-total: 180 30% 15%;
+    --table-total-border: 180 30% 25%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield; /* Standard property for other browsers */
+}
+
+/* Custom table utility classes for dark mode support */
+@layer utilities {
+  .bg-table-written {
+    background-color: hsl(var(--table-written));
+  }
+  .bg-table-written\/20 {
+    background-color: hsl(var(--table-written) / 0.2);
+  }
+  .bg-table-written\/30 {
+    background-color: hsl(var(--table-written) / 0.3);
+  }
+  .bg-table-written\/50 {
+    background-color: hsl(var(--table-written) / 0.5);
+  }
+  .border-table-written {
+    border-color: hsl(var(--table-written-border));
+  }
+  
+  .bg-table-performance {
+    background-color: hsl(var(--table-performance));
+  }
+  .bg-table-performance\/20 {
+    background-color: hsl(var(--table-performance) / 0.2);
+  }
+  .bg-table-performance\/30 {
+    background-color: hsl(var(--table-performance) / 0.3);
+  }
+  .bg-table-performance\/50 {
+    background-color: hsl(var(--table-performance) / 0.5);
+  }
+  .border-table-performance {
+    border-color: hsl(var(--table-performance-border));
+  }
+  
+  .bg-table-exam {
+    background-color: hsl(var(--table-exam));
+  }
+  .bg-table-exam\/20 {
+    background-color: hsl(var(--table-exam) / 0.2);
+  }
+  .bg-table-exam\/30 {
+    background-color: hsl(var(--table-exam) / 0.3);
+  }
+  .bg-table-exam\/50 {
+    background-color: hsl(var(--table-exam) / 0.5);
+  }
+  .border-table-exam {
+    border-color: hsl(var(--table-exam-border));
+  }
+  
+  .bg-table-total {
+    background-color: hsl(var(--table-total));
+  }
+  .bg-table-total\/20 {
+    background-color: hsl(var(--table-total) / 0.2);
+  }
+  .bg-table-total\/30 {
+    background-color: hsl(var(--table-total) / 0.3);
+  }
+  .bg-table-total\/50 {
+    background-color: hsl(var(--table-total) / 0.5);
+  }
+  .border-table-total {
+    border-color: hsl(var(--table-total-border));
+  }
+}

@@ -1,0 +1,218 @@
+#root {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 2rem;
+  text-align: center;
+}
+
+.logo {
+  height: 6em;
+  padding: 1.5em;
+  will-change: filter;
+  transition: filter 300ms;
+}
+.logo:hover {
+  filter: drop-shadow(0 0 2em #646cffaa);
+}
+.logo.react:hover {
+  filter: drop-shadow(0 0 2em #61dafbaa);
+}
+
+@keyframes logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  a:nth-of-type(2) .logo {
+    animation: logo-spin infinite 20s linear;
+  }
+}
+
+.card {
+  padding: 2em;
+}
+
+.read-the-docs {
+  color: #888;
+}
+
+/* Remove number input spinners/caret */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield; /* Standard property for other browsers */
+}
+
+/* AG Grid custom border/theme tweaks to give a modern, bordered table look */
+.ag-theme-quartz {
+  --ag-background-color: #ffffff;
+  --ag-foreground-color: #1f2937;
+  --ag-border-color: #e5e7eb;
+  --ag-header-background-color: #f9fafb;
+  --ag-header-foreground-color: #374151;
+  --ag-odd-row-background-color: #ffffff;
+  --ag-row-hover-color: #f3f4f6;
+  --ag-font-size: 13px;
+  --ag-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+/* Outer grid border - clean and modern */
+.ag-theme-quartz .ag-root-wrapper {
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+
+/* Header styling - clean modern look */
+.ag-theme-quartz .ag-header {
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.ag-theme-quartz .ag-header-cell {
+  border-right: 1px solid #e5e7eb;
+  padding: 0.75rem 0.5rem;
+  font-weight: 600;
+  font-size: 12px;
+  text-align: center;
+}
+
+.ag-theme-quartz .ag-header-group-cell {
+  border-right: 1px solid #e5e7eb;
+  border-bottom: 1px solid #e5e7eb;
+  padding: 0.5rem;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+/* Cell styling - clean with proper borders */
+.ag-theme-quartz .ag-cell {
+  border-right: 1px solid #f3f4f6;
+  border-bottom: 1px solid #f3f4f6;
+  padding: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1.5;
+}
+
+/* Pinned left columns - stronger border */
+.ag-theme-quartz .ag-pinned-left {
+  border-right: 2px solid #e5e7eb;
+}
+
+.ag-theme-quartz .ag-pinned-left .ag-cell {
+  background-color: #ffffff;
+  justify-content: flex-start;
+}
+
+/* Header cell labels */
+.ag-theme-quartz .ag-header-cell-label {
+  font-weight: 600;
+  justify-content: center;
+}
+
+/* Final grade column highlight */
+.ag-theme-quartz .ag-cell.ag-final-grade {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+}
+
+/* Group header background colors - modern pastel shades */
+.ag-theme-quartz .ag-header-group-cell.group-header-blue {
+  background-color: #dbeafe !important;
+  border-bottom-color: #93c5fd !important;
+}
+.ag-theme-quartz .ag-header-group-cell.group-header-green {
+  background-color: #d1fae5 !important;
+  border-bottom-color: #6ee7b7 !important;
+}
+.ag-theme-quartz .ag-header-group-cell.group-header-amber {
+  background-color: #fef3c7 !important;
+  border-bottom-color: #fcd34d !important;
+}
+.ag-theme-quartz .ag-header-group-cell.group-header-accent {
+  background-color: #e9d5ff !important;
+  border-bottom-color: #c084fc !important;
+}
+
+/* Student name multi-line styling */
+.ag-theme-quartz .student-name { 
+  text-align: left;
+  width: 100%;
+  line-height: 1.4;
+}
+.ag-theme-quartz .student-name-line { 
+  font-weight: 600;
+  color: #1f2937;
+  font-size: 13px;
+}
+.ag-theme-quartz .student-id { 
+  font-size: 11px;
+  color: #6b7280;
+  margin-top: 2px;
+}
+
+/* Final grade pill styles - clean modern look */
+.ag-theme-quartz .ag-cell.ag-final-grade.grade-pass {
+  background-color: #d1fae5 !important;
+  color: #065f46 !important;
+  font-weight: 700;
+  font-size: 14px;
+}
+.ag-theme-quartz .ag-cell.ag-final-grade.grade-fail {
+  background-color: #fee2e2 !important;
+  color: #991b1b !important;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+/* Pinned HPS top row styling */
+.ag-theme-quartz .ag-floating-top {
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.ag-theme-quartz .ag-floating-top .ag-cell {
+  background-color: #f9fafb;
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b7280;
+  border-bottom: none;
+}
+
+.ag-theme-quartz .ag-floating-top .student-name-line { 
+  font-weight: 700;
+  color: #374151;
+}
+
+/* Editable cells hover state */
+.ag-theme-quartz .ag-cell[col-id]:not(.ag-cell-inline-editing):hover {
+  background-color: #f3f4f6 !important;
+}
+
+/* Row hover */
+.ag-theme-quartz .ag-row-hover {
+  background-color: #f9fafb !important;
+}
+
+/* Center align numeric cells */
+.ag-theme-quartz .ag-cell[col-id^="w"],
+.ag-theme-quartz .ag-cell[col-id^="p"],
+.ag-theme-quartz .ag-cell[col-id="exam"] {
+  justify-content: center;
+  text-align: center;
+}
+
+
+
