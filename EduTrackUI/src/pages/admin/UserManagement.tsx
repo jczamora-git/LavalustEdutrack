@@ -12,7 +12,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus, Search, Edit, Trash2, Users, Grid3x3, List, Loader2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertMessage } from "@/components/AlertMessage";
+import { useConfirm } from "@/components/Confirm";
 import { API_ENDPOINTS, apiGet, apiPost, apiPut, apiDelete } from "@/lib/api";
+import { Pagination } from "@/components/Pagination";
 import { toast } from "sonner";
 
 const UserManagement = () => {
@@ -38,6 +40,8 @@ const UserManagement = () => {
 
   // Dialog/form state
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isSelectRoleOpen, setIsSelectRoleOpen] = useState(false);
+  const [openedFromSelector, setOpenedFromSelector] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [form, setForm] = useState<{ 
@@ -47,6 +51,7 @@ const UserManagement = () => {
     role: "admin" | "teacher" | "student"; 
     status: string;
     phone?: string;
+    yearLevel?: string;
   }>({
     firstName: "",
     lastName: "",
@@ -54,13 +59,18 @@ const UserManagement = () => {
     role: "student",
     status: "active",
     phone: "",
+    yearLevel: "1st Year",
   });
 
   const [alert, setAlert] = useState<{ type: "success" | "error" | "info"; message: string } | null>(null);
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const itemsPerPage = 10;
 
   const showAlert = (type: "success" | "error" | "info", message: string) => {
     setAlert({ type, message });
   };
+
+  const confirm = useConfirm();
 
   useEffect(() => {
     if (!roleLoading) {
@@ -105,9 +115,24 @@ const UserManagement = () => {
     }
   }, [roleFilter, searchQuery]);
 
+  // Reset pagination when filters/search change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [roleFilter, searchQuery]);
+
+  // clamp currentPage to available pages
+  const totalItems = users.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+  }, [currentPage, totalPages]);
+
+  const pagedUsers = users.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
   const handleOpenCreate = () => {
-    setForm({ firstName: "", lastName: "", email: "", role: "student", status: "active", phone: "" });
-    setIsCreateOpen(true);
+    // Open the role selection dialog first
+    setForm({ firstName: "", lastName: "", email: "", role: "student", status: "active", phone: "", yearLevel: "1st Year" });
+    setIsSelectRoleOpen(true);
   };
 
   const handleCreate = async () => {
@@ -149,8 +174,8 @@ const UserManagement = () => {
       }
 
       // Step 3: Reset form and refresh
-      setIsCreateOpen(false);
-      setForm({ firstName: "", lastName: "", email: "", role: "student", status: "active", phone: "" });
+  setIsCreateOpen(false);
+  setForm({ firstName: "", lastName: "", email: "", role: "student", status: "active", phone: "", yearLevel: "1st Year" });
       fetchUsers(); // Refresh the list
     } catch (error: any) {
       console.error("Create error:", error);
@@ -159,6 +184,19 @@ const UserManagement = () => {
       setIsLoading(false);
     }
   };
+
+  const handleSelectRole = (role: "admin" | "teacher" | "student") => {
+    // set role and open the create modal
+    setForm((f) => ({ ...f, role, yearLevel: role === 'student' ? (f.yearLevel || '1st Year') : undefined }));
+    setIsSelectRoleOpen(false);
+    setOpenedFromSelector(true);
+    setIsCreateOpen(true);
+  };
+
+  // clear openedFromSelector when create modal closes
+  useEffect(() => {
+    if (!isCreateOpen) setOpenedFromSelector(false);
+  }, [isCreateOpen]);
 
   // Create teacher profile
   const createTeacherProfile = async (userId: number) => {
@@ -201,7 +239,8 @@ const UserManagement = () => {
       console.log("Generated student ID:", studentId);
 
       // Insert into students table
-      const query = `INSERT INTO \`students\` (\`user_id\`, \`student_id\`, \`year_level\`, \`status\`) VALUES (${userId}, '${studentId}', '1st Year', 'active')`;
+      const yearLevel = form.yearLevel || '1st Year';
+      const query = `INSERT INTO \`students\` (\`user_id\`, \`student_id\`, \`year_level\`, \`status\`) VALUES (${userId}, '${studentId}', '${yearLevel}', 'active')`;
       console.log("Executing query:", query);
 
       // Since we don't have a direct query endpoint, we'll use a custom API call
@@ -213,7 +252,7 @@ const UserManagement = () => {
         body: JSON.stringify({
           user_id: userId,
           student_id: studentId,
-          year_level: '1st Year',
+          year_level: yearLevel,
           status: 'active'
         }),
         credentials: 'include'
@@ -338,9 +377,15 @@ const UserManagement = () => {
     const u = users.find((x) => x.id === id);
     if (!u) return;
     
-    if (!confirm(`Inactivate user ${u.first_name} ${u.last_name}? This will set the user to INACTIVE status.`)) {
-      return;
-    }
+    const ok = await confirm({
+      title: 'Inactivate user',
+      description: `Inactivate user ${u.first_name} ${u.last_name}? This will set the user to INACTIVE status.`,
+      emphasis: `${u.first_name} ${u.last_name}`,
+      confirmText: 'Inactivate',
+      cancelText: 'Cancel',
+      variant: 'destructive'
+    });
+    if (!ok) return;
 
     setIsLoading(true);
     try {
@@ -431,7 +476,7 @@ const UserManagement = () => {
               </div>
             ) : viewMode === "grid" ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {users.map((user) => (
+                {pagedUsers.map((user) => (
                   <div
                     key={user.id}
                     className={`rounded-2xl border-2 transition-all duration-300 flex flex-col overflow-hidden ${
@@ -501,7 +546,7 @@ const UserManagement = () => {
               </div>
             ) : (
               <div className="space-y-3">
-                {users.map((user) => (
+                {pagedUsers.map((user) => (
                   <div
                     key={user.id}
                     className={`flex items-center justify-between p-5 border-2 rounded-2xl transition-all duration-300 ${
@@ -564,8 +609,39 @@ const UserManagement = () => {
                 <p className="text-sm text-muted-foreground mt-2">Try adjusting your search or filters</p>
               </div>
             )}
+            {/* Pagination controls for users */}
+            {!isLoading && totalItems > 0 && (
+              <div className="mt-6 px-2">
+                <Pagination
+                  currentPage={currentPage}
+                  totalItems={totalItems}
+                  itemsPerPage={itemsPerPage}
+                  onPageChange={(p) => setCurrentPage(p)}
+                />
+              </div>
+            )}
           </CardContent>
         </Card>
+
+        {/* Role selection dialog (first step) */}
+        <Dialog open={isSelectRoleOpen} onOpenChange={setIsSelectRoleOpen}>
+          <DialogContent className="max-w-2xl border-0 shadow-2xl">
+            <DialogHeader className="bg-gradient-to-r from-primary to-accent px-6 py-6 -mx-6 -mt-6 mb-4 rounded-t-lg">
+              <DialogTitle className="text-2xl font-bold text-white">Which user would you like to create?</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 px-6 pb-6">
+              <p className="text-sm text-muted-foreground">Choose the account type to create. For students you'll be able to select a year level in the next step.</p>
+              <div className="flex gap-3">
+                <Button className="flex-1 bg-gradient-to-r from-primary to-accent text-white" onClick={() => handleSelectRole('admin')}>Admin</Button>
+                <Button className="flex-1 bg-gradient-to-r from-primary to-accent text-white" onClick={() => handleSelectRole('teacher')}>Teacher</Button>
+                <Button className="flex-1 bg-gradient-to-r from-primary to-accent text-white" onClick={() => handleSelectRole('student')}>Student</Button>
+              </div>
+              <div className="text-right mt-3">
+                <Button variant="outline" onClick={() => setIsSelectRoleOpen(false)}>Cancel</Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {/* Create dialog (controlled) */}
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
@@ -618,19 +694,47 @@ const UserManagement = () => {
                   className="mt-2 py-3 text-base border-2 focus:border-accent-500 rounded-lg"
                 />
               </div>
-              <div>
-                <Label htmlFor="role" className="font-semibold text-lg">Role *</Label>
-                <Select value={form.role} onValueChange={(v) => setForm((f) => ({ ...f, role: v as any }))}>
-                  <SelectTrigger className="mt-2 py-3 text-base border-2 focus:border-accent-500 rounded-lg bg-background">
-                    <SelectValue>{form.role.charAt(0).toUpperCase() + form.role.slice(1)}</SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="admin">Admin</SelectItem>
-                    <SelectItem value="teacher">Teacher</SelectItem>
-                    <SelectItem value="student">Student</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              {!openedFromSelector && (
+                <div>
+                  <Label htmlFor="role" className="font-semibold text-lg">Role *</Label>
+                  <Select value={form.role} onValueChange={(v) => setForm((f) => ({ ...f, role: v as any }))}>
+                    <SelectTrigger className="mt-2 py-3 text-base border-2 focus:border-accent-500 rounded-lg bg-background">
+                      <SelectValue>{form.role.charAt(0).toUpperCase() + form.role.slice(1)}</SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="admin">Admin</SelectItem>
+                      <SelectItem value="teacher">Teacher</SelectItem>
+                      <SelectItem value="student">Student</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {openedFromSelector && (
+                <div>
+                  <Label className="font-semibold text-lg">Role</Label>
+                  <div className="mt-2">
+                    <Badge variant="secondary" className="capitalize font-semibold px-3 py-2 bg-gradient-to-r from-primary/10 to-accent/10 text-primary border border-primary/20">{form.role}</Badge>
+                  </div>
+                </div>
+              )}
+
+              {form.role === 'student' && (
+                <div>
+                  <Label htmlFor="yearLevel" className="font-semibold text-lg">Year Level *</Label>
+                  <Select value={form.yearLevel} onValueChange={(v) => setForm((f) => ({ ...f, yearLevel: v }))}>
+                    <SelectTrigger className="mt-2 py-3 text-base border-2 focus:border-accent-500 rounded-lg bg-background">
+                      <SelectValue>{form.yearLevel}</SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1st Year">1st Year</SelectItem>
+                      <SelectItem value="2nd Year">2nd Year</SelectItem>
+                      <SelectItem value="3rd Year">3rd Year</SelectItem>
+                      <SelectItem value="4th Year">4th Year</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               
               <div className="bg-muted/20 border-2 border-muted rounded-lg p-4 mt-4">
                 <p className="text-sm text-muted-foreground font-medium">

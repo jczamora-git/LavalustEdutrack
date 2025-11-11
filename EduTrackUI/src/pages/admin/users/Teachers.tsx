@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus, Search, Edit, Trash2, GraduationCap, BookOpen, Grid3x3, List, Loader2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertMessage } from "@/components/AlertMessage";
+import { useConfirm } from "@/components/Confirm";
 import { API_ENDPOINTS, apiGet, apiPost, apiPut, apiDelete } from "@/lib/api";
 import { toast } from "sonner";
 
@@ -23,7 +24,13 @@ type Teacher = {
   employeeId: string;
   phone?: string;
   status: "active" | "inactive";
-  assignedCourses: { course: string; title?: string; units?: number; sections: string[]; yearLevel?: string }[];
+  assignedCourses: { 
+    course: string; 
+    title?: string; 
+    units?: number; 
+    sections: (string | { id?: number; section_id?: number; name?: string; section_name?: string; students_count?: number })[]; 
+    yearLevel?: string 
+  }[];
 };
 
 const Teachers = () => {
@@ -56,14 +63,16 @@ const Teachers = () => {
     setAlert({ type, message });
   };
 
+  const confirm = useConfirm();
+
   useEffect(() => {
     if (!roleLoading) {
       if (!isAuthenticated || !isAdmin) {
         navigate("/auth");
       } else {
-        fetchTeachers();
-        fetchSubjects();
-        fetchSections();
+  fetchTeachers();
+  fetchSubjects();
+  fetchYearLevelData();
       }
     }
   }, [isAuthenticated, isAdmin, navigate, roleLoading]);
@@ -81,7 +90,7 @@ const Teachers = () => {
       
       if (response.success) {
         // Transform API response to match component structure
-        const transformedTeachers = response.teachers.map((t: any) => ({
+        let transformedTeachers = response.teachers.map((t: any) => ({
           id: t.id.toString(),
           firstName: t.first_name,
           lastName: t.last_name,
@@ -89,9 +98,36 @@ const Teachers = () => {
           employeeId: t.employee_id,
           phone: t.phone || '',
           status: t.status,
-          assignedCourses: t.assigned_courses || []
+          assignedCourses: t.assigned_courses || t.assignedCourses || []
         }));
-        setTeachers(transformedTeachers);
+
+        // Ensure we have up-to-date assigned courses for each teacher.
+        // The /api/teachers endpoint may not include assignment details for every teacher,
+        // so fetch per-teacher assignments in parallel and merge into the list.
+        const withAssignments = await Promise.all(
+          transformedTeachers.map(async (tt) => {
+            try {
+              const res = await apiGet(API_ENDPOINTS.TEACHER_ASSIGNMENTS_BY_TEACHER(tt.id));
+              const assigned = (res && (res.assigned_courses || res.assignedCourses || res.assignments)) || [];
+              // Normalize to the UI shape used elsewhere: { course, title?, units?, sections: [], yearLevel? }
+              const mapped = Array.isArray(assigned)
+                ? assigned.map((a: any) => ({
+                    course: a.course_code ?? a.course ?? a.courseCode ?? a.course_code,
+                    title: a.course_name ?? a.course_name ?? a.title ?? a.course_name,
+                    units: a.credits ?? a.units,
+                    sections: a.sections || [],
+                    yearLevel: a.year_level ?? a.yearLevel ?? undefined,
+                  }))
+                : [];
+              return { ...tt, assignedCourses: mapped };
+            } catch (err) {
+              // If assignment fetch fails, return teacher as-is
+              return tt;
+            }
+          })
+        );
+
+        setTeachers(withAssignments);
       }
     } catch (error: any) {
       console.error('Fetch teachers error:', error);
@@ -115,20 +151,70 @@ const Teachers = () => {
     const matchesStatus = statusFilter === "all" || t.status === statusFilter;
     return matchesQuery && matchesStatus;
   });
+  // Year levels and their sections (fetched as year_level_sections)
+  const [yearLevels, setYearLevels] = useState<{ id: number; name: string }[]>([]);
+  const [yearLevelSectionsMap, setYearLevelSectionsMap] = useState<Record<string, { id: number; name: string }[]>>({});
 
-  // Sections fetched from backend (names like F1, F2, etc.)
-  const [sections, setSections] = useState<{ id: number; name: string; description?: string }[]>([]);
+  const ordinal = (n: number) => {
+    if (n % 10 === 1 && n % 100 !== 11) return `${n}st Year`;
+    if (n % 10 === 2 && n % 100 !== 12) return `${n}nd Year`;
+    if (n % 10 === 3 && n % 100 !== 13) return `${n}rd Year`;
+    return `${n}th Year`;
+  };
 
-  const fetchSections = async () => {
+  const fetchYearLevelData = async () => {
     try {
-      const degree = 'Bachelor of Science in Information Technology';
-      const url = `${API_ENDPOINTS.SECTIONS}?description=${encodeURIComponent(degree)}`;
-      const res = await apiGet(url);
-      if (res && res.success) {
-        setSections(res.sections || []);
+      // Fetch year levels (optional)
+      try {
+        const ylRes = await apiGet(API_ENDPOINTS.YEAR_LEVELS);
+        const ylRows = ylRes && (ylRes.year_levels || ylRes.rows || Array.isArray(ylRes) ? ylRes : []) || [];
+        if (Array.isArray(ylRows) && ylRows.length) {
+          const mapped = ylRows.map((y: any) => ({ id: Number(y.id), name: y.name || y.label || ordinal(Number(y.id)) }));
+          setYearLevels(mapped);
+        } else {
+          // fallback default 1..4
+          setYearLevels([{ id: 1, name: ordinal(1) }, { id: 2, name: ordinal(2) }, { id: 3, name: ordinal(3) }, { id: 4, name: ordinal(4) }]);
+        }
+      } catch (e) {
+        // fallback defaults
+        setYearLevels([{ id: 1, name: ordinal(1) }, { id: 2, name: ordinal(2) }, { id: 3, name: ordinal(3) }, { id: 4, name: ordinal(4) }]);
       }
+
+      // Fetch year_level_sections mapping
+      const res = await apiGet(API_ENDPOINTS.YEAR_LEVEL_SECTIONS);
+
+      // Accept multiple response shapes: { mappings }, { organized }, etc.
+      const map: Record<string, { id: number; name: string }[]> = {};
+      const mappings = res && (res.mappings || res.year_level_sections || res.rows || (Array.isArray(res) ? res : []));
+      const organized = res && res.organized;
+
+      if (organized && typeof organized === 'object') {
+        for (const [display, list] of Object.entries(organized)) {
+          if (!Array.isArray(list)) continue;
+          map[display] = list.map((n: any, i: number) => ({ id: i + 1, name: String(n) }));
+          const m = String(display).match(/^(\d+)/);
+          if (m) map[m[1]] = map[display];
+        }
+      }
+
+      if (Array.isArray(mappings) && mappings.length) {
+        for (const r of mappings) {
+          const ylId = r.year_level_id ?? r.year_level ?? r.year_level_id;
+          const sectionName = r.section_name ?? r.section ?? r.name ?? r.section_name;
+          const display = r.year_level_name ?? ordinal(Number(ylId));
+          if (!ylId || !sectionName) continue;
+
+          const keyId = String(ylId);
+          if (!map[keyId]) map[keyId] = [];
+          if (!map[keyId].some((s) => s.name === sectionName)) map[keyId].push({ id: Number(r.section_id ?? r.id ?? 0), name: String(sectionName) });
+          if (!map[display]) map[display] = map[keyId];
+        }
+      }
+
+      setYearLevelSectionsMap(map);
     } catch (err) {
-      console.error('Failed to fetch sections', err);
+      console.error('Failed to fetch year level sections', err);
+      // leave map empty — UI will show fallback sections
     }
   };
   // subjects fetched from backend (course_code, course_name, credits)
@@ -137,11 +223,13 @@ const Teachers = () => {
   const fetchSubjects = async () => {
     try {
       const res = await apiGet(API_ENDPOINTS.SUBJECTS);
-      if (res && res.success) {
-        const mapped = (res.subjects || []).map((s: any) => ({
-          code: s.course_code,
-          title: s.course_name,
-          units: s.credits ?? 3,
+      // Accept a few possible response shapes: { success, subjects: [...] } or { subjects: [...] } or array directly
+      const rows = res && res.subjects ? res.subjects : Array.isArray(res) ? res : (res && res.rows) ? res.rows : [];
+      if (rows && Array.isArray(rows)) {
+        const mapped = rows.map((s: any) => ({
+          code: (s.course_code || s.code || s.course || '')?.toString().toUpperCase(),
+          title: (s.course_name || s.title || '')?.toString(),
+          units: s.credits ?? s.units ?? 3,
         }));
         setSubjects(mapped);
       }
@@ -155,7 +243,8 @@ const Teachers = () => {
   const getCourseSuggestions = (query: string) => {
     const q = normalize(query || "");
     if (!q) return [];
-    return subjects.filter((c) => c.code.includes(q) || c.title.toUpperCase().includes(query.trim().toUpperCase())).slice(0, 8);
+    const qTitle = query.trim().toUpperCase();
+    return subjects.filter((c) => (c.code || '').toUpperCase().includes(q) || (c.title || '').toUpperCase().includes(qTitle)).slice(0, 8);
   };
 
   const setCourseFromSuggestion = (idx: number, courseObj: { code: string; title: string; units: number }) => {
@@ -165,10 +254,26 @@ const Teachers = () => {
     }));
   };
 
+  // Ensure subjects are loaded when user focuses an input (lazy-load if necessary)
+  const ensureSubjectsLoaded = async () => {
+    if (!subjects || subjects.length === 0) {
+      await fetchSubjects();
+    }
+  };
+
   const updateAssignedCourseYearLevel = (idx: number, value: string) => {
     setForm((f) => ({
       ...f,
-      assignedCourses: f.assignedCourses.map((ac, i) => (i === idx ? { ...ac, yearLevel: value } : ac)),
+      assignedCourses: f.assignedCourses.map((ac, i) => 
+        i === idx 
+          ? { 
+              ...ac, 
+              yearLevel: value,
+              // Clear sections when year level changes to avoid showing wrong sections
+              sections: []
+            } 
+          : ac
+      ),
     }));
   };
 
@@ -187,6 +292,26 @@ const Teachers = () => {
       ...f,
       assignedCourses: f.assignedCourses.map((ac, i) => (i === idx ? { ...ac, course: value, title: undefined, units: undefined } : ac)),
     }));
+  };
+
+  // Generate next employee ID by asking backend for last id and incrementing
+  const generateEmployeeId = async (): Promise<string> => {
+    try {
+      const year = new Date().getFullYear();
+      const res = await apiGet(`${API_ENDPOINTS.TEACHERS}/last-id?year=${year}`);
+      if (res && res.last_id) {
+        const match = String(res.last_id).match(/EMP\d+-(\d+)/);
+        if (match) {
+          const nextNum = parseInt(match[1], 10) + 1;
+          return `EMP${year}-${String(nextNum).padStart(3, '0')}`;
+        }
+      }
+      return `EMP${year}-001`;
+    } catch (err) {
+      console.error('Error generating employee ID:', err);
+      const year = new Date().getFullYear();
+      return `EMP${year}-001`;
+    }
   };
 
   const toggleSection = (idx: number, section: string) => {
@@ -214,30 +339,69 @@ const Teachers = () => {
     setIsCreateOpen(true);
   };
 
-  const handleCreate = () => {
-    if (!form.firstName.trim() || !form.lastName.trim() || !form.email.trim() || !form.employeeId.trim()) {
-      toast.error("First name, last name, email and employee ID are required");
+  const handleCreate = async () => {
+    if (!form.firstName.trim() || !form.lastName.trim() || !form.email.trim()) {
+      toast.error("First name, last name and email are required");
       return;
     }
 
     setIsLoading(true);
+    let createdUserId: number | string | null = null;
     try {
-  apiPost(API_ENDPOINTS.TEACHERS, {
+      // Step 1: create a user record with role=teacher
+      const userResp = await apiPost(API_ENDPOINTS.USERS, {
         firstName: form.firstName.trim(),
         lastName: form.lastName.trim(),
         email: form.email.trim(),
-        employeeId: form.employeeId.trim(),
+        role: 'teacher',
+        phone: form.phone?.trim() || "",
+        password: 'demo123'
+      });
+
+      if (!userResp || !userResp.success || !userResp.user) {
+        const msg = (userResp && userResp.message) || 'Failed to create user';
+        toast.error(msg);
+        return;
+      }
+
+      createdUserId = userResp.user.id;
+
+      // Step 2: create teacher profile linked to the user
+      // If employeeId was not provided (create flow), generate one
+      const employeeIdToUse = form.employeeId && String(form.employeeId).trim() ? String(form.employeeId).trim() : await generateEmployeeId();
+      const teacherResp = await apiPost(API_ENDPOINTS.TEACHERS, {
+        user_id: createdUserId,
+        employee_id: employeeIdToUse,
         phone: form.phone?.trim() || "",
         assignedCourses: form.assignedCourses
-      }).then(response => {
-        if (response.success) {
-          toast.success("Teacher created successfully");
-          setIsCreateOpen(false);
-          fetchTeachers();
-        }
       });
+
+      if (!teacherResp || !teacherResp.success) {
+        // attempt to clean up the created user to avoid dangling accounts
+        try {
+          if (createdUserId) await apiDelete(API_ENDPOINTS.USER_BY_ID(String(createdUserId)));
+        } catch (cleanupErr) {
+          console.warn('Failed to cleanup created user after teacher profile failure', cleanupErr);
+        }
+        const msg = (teacherResp && teacherResp.message) || 'Failed to create teacher profile';
+        toast.error(msg);
+        return;
+      }
+
+      toast.success(`Teacher created successfully${userResp.default_password ? ` — default password: ${userResp.default_password}` : ''}`);
+      setIsCreateOpen(false);
+      fetchTeachers();
     } catch (error: any) {
-      toast.error(error.message || "Failed to create teacher");
+      console.error('Create teacher error:', error);
+      // If teacher creation failed after user creation, try cleanup
+      if (createdUserId) {
+        try {
+          await apiDelete(API_ENDPOINTS.USER_BY_ID(String(createdUserId)));
+        } catch (cleanupErr) {
+          console.warn('Cleanup failed', cleanupErr);
+        }
+      }
+      toast.error(error?.message || 'Failed to create teacher');
     } finally {
       setIsLoading(false);
     }
@@ -290,19 +454,26 @@ const Teachers = () => {
     }
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     const t = teachers.find((x) => x.id === id);
     if (!t) return;
-    if (!confirm(`Inactivate teacher ${t.firstName} ${t.lastName}? This will set the teacher to INACTIVE status.`)) return;
-    
+    const ok = await confirm({
+      title: 'Inactivate teacher',
+      description: `Inactivate teacher ${t.firstName} ${t.lastName}? This will set the teacher to INACTIVE status.`,
+      emphasis: `${t.firstName} ${t.lastName}`,
+      confirmText: 'Inactivate',
+      cancelText: 'Cancel',
+      variant: 'destructive'
+    });
+    if (!ok) return;
+
     setIsLoading(true);
     try {
-  apiDelete(`${API_ENDPOINTS.TEACHERS}/${id}`).then(response => {
-        if (response.success) {
-          toast.success(`Teacher ${t.firstName} ${t.lastName} has been set to inactive`);
-          fetchTeachers();
-        }
-      });
+      const response = await apiDelete(`${API_ENDPOINTS.TEACHERS}/${id}`);
+      if (response && response.success) {
+        toast.success(`Teacher ${t.firstName} ${t.lastName} has been set to inactive`);
+        fetchTeachers();
+      }
     } catch (error: any) {
       toast.error(error.message || "Failed to delete teacher");
     } finally {
@@ -428,11 +599,15 @@ const Teachers = () => {
                                 <p className="font-semibold text-xs">{ac.course}</p>
                                 {ac.sections.length > 0 && (
                                   <div className="flex flex-wrap gap-1 mt-1">
-                                    {ac.sections.map((s) => (
-                                      <Badge key={s} variant="default" className="text-xs font-semibold bg-gradient-to-r from-primary to-accent text-white">
-                                        {s}
-                                      </Badge>
-                                    ))}
+                                    {ac.sections.map((s, idx) => {
+                                      const sectionName = typeof s === 'string' ? s : (s.name ?? s.section_name ?? String(s.id ?? idx));
+                                      const sectionKey = typeof s === 'string' ? s : (s.id ?? s.section_id ?? idx);
+                                      return (
+                                        <Badge key={sectionKey} variant="default" className="text-xs font-semibold bg-gradient-to-r from-primary to-accent text-white">
+                                          {sectionName}
+                                        </Badge>
+                                      );
+                                    })}
                                   </div>
                                 )}
                               </div>
@@ -534,11 +709,15 @@ const Teachers = () => {
                               </div>
                               {ac.sections.length > 0 && (
                                 <div className="flex flex-wrap gap-1 mt-2">
-                                  {ac.sections.map((s) => (
-                                    <Badge key={s} variant="default" className="text-xs font-semibold bg-gradient-to-r from-primary to-accent text-white">
-                                      {s}
-                                    </Badge>
-                                  ))}
+                                  {ac.sections.map((s, idx) => {
+                                    const sectionName = typeof s === 'string' ? s : (s.name ?? s.section_name ?? String(s.id ?? idx));
+                                    const sectionKey = typeof s === 'string' ? s : (s.id ?? s.section_id ?? idx);
+                                    return (
+                                      <Badge key={sectionKey} variant="default" className="text-xs font-semibold bg-gradient-to-r from-primary to-accent text-white">
+                                        {sectionName}
+                                      </Badge>
+                                    );
+                                  })}
                                 </div>
                               )}
                             </div>
@@ -615,14 +794,15 @@ const Teachers = () => {
                     />
                   </div>
                   <div>
-                    <Label htmlFor="employeeId" className="font-semibold">Employee ID *</Label>
+                    <Label className="font-semibold">Employee ID</Label>
                     <Input
                       id="employeeId"
                       value={form.employeeId}
-                      onChange={(e) => setForm((f) => ({ ...f, employeeId: e.target.value }))}
-                      placeholder="e.g., EMP001"
-                      className="mt-1"
+                      placeholder="Auto-generated"
+                      disabled
+                      className="mt-1 bg-muted/10"
                     />
+                    <p className="text-xs text-muted-foreground mt-2">Employee ID will be auto-generated when creating the teacher.</p>
                   </div>
                 </div>
               <div className="grid grid-cols-2 gap-4">
@@ -660,98 +840,6 @@ const Teachers = () => {
                     </SelectContent>
                   </Select>
                 </div>
-              <div>
-                <Label className="font-semibold">Assigned Courses</Label>
-                <div className="space-y-3 mt-3">
-                  {form.assignedCourses.map((ac, idx) => (
-                    <div key={idx} className="space-y-2 p-4 border rounded-lg bg-muted/30 transition-colors hover:bg-muted/40">
-                      <div className="flex items-start gap-2">
-                        <div className="relative flex-1">
-                          <Input
-                            placeholder="Search course e.g., ITC111"
-                            value={ac.course}
-                            onChange={(e) => updateCourseCode(idx, e.target.value)}
-                            onFocus={() => setFocusedCourseIdx(idx)}
-                            onBlur={() => setTimeout(() => setFocusedCourseIdx((v) => (v === idx ? null : v)), 150)}
-                            className="w-full"
-                          />
-                          {focusedCourseIdx === idx && ac.course && (
-                            <div className="absolute z-20 top-full left-0 mt-1 w-full max-h-64 overflow-y-auto bg-popover border border-border rounded-md shadow-lg">
-                              {getCourseSuggestions(ac.course).map((c) => (
-                                <div
-                                  key={c.code}
-                                  className="p-3 hover:bg-muted/60 cursor-pointer transition-colors border-b border-border/50 last:border-0"
-                                  onMouseDown={() => { setCourseFromSuggestion(idx, c); setFocusedCourseIdx(null); }}
-                                >
-                                  <div className="font-semibold text-sm">{c.code}</div>
-                                  <div className="text-sm text-foreground/90">{c.title}</div>
-                                  <div className="text-xs text-muted-foreground">{c.units} units</div>
-                                </div>
-                              ))}
-                              {getCourseSuggestions(ac.course).length === 0 && (
-                                <div className="p-4 text-center text-sm text-muted-foreground">
-                                  No courses found
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                        <Button variant="ghost" size="icon" className="shrink-0 text-destructive hover:text-destructive" onClick={() => removeCourseRow(idx)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                      {ac.course && (
-                        <div className="space-y-3 w-full">
-                          <div className="flex items-center justify-between gap-4">
-                            <div>
-                              <p className="font-semibold text-sm text-foreground">{ac.course}{ac.title ? ` — ${ac.title}` : ''}</p>
-                              {ac.units !== undefined && <p className="text-xs text-muted-foreground">{ac.units} units</p>}
-                            </div>
-                            <div className="w-40">
-                              <Select value={ac.yearLevel || '1st Year'} onValueChange={(v) => updateAssignedCourseYearLevel(idx, v)}>
-                                <SelectTrigger className="mt-1">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="1st Year">1st Year</SelectItem>
-                                  <SelectItem value="2nd Year">2nd Year</SelectItem>
-                                  <SelectItem value="3rd Year">3rd Year</SelectItem>
-                                  <SelectItem value="4th Year">4th Year</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-3 flex-wrap">
-                            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Sections:</span>
-                            <div className="flex gap-2 flex-wrap">
-                              {(sections.length ? sections.map((sec) => sec.name) : ["F1", "F2", "F3", "F4", "F5", "F6"]).map((s) => {
-                                  const active = ac.sections.includes(s);
-                                  return (
-                                    <Button
-                                      key={s}
-                                      size="sm"
-                                      variant={active ? "default" : "outline"}
-                                      className="font-medium"
-                                      onClick={() => toggleSection(idx, s)}
-                                    >
-                                      {s}
-                                    </Button>
-                                  );
-                                })}
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                  <Button onClick={addCourseRow} variant="outline" className="w-full">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Course
-                  </Button>
-                  <p className="text-xs text-muted-foreground">Assign courses and select sections (F1..F6)</p>
-                </div>
-              </div>
               <Button className="w-full bg-gradient-to-r from-primary to-accent hover:from-primary hover:to-accent text-white font-semibold" onClick={handleCreate}>
                 Add Teacher
               </Button>
@@ -828,98 +916,22 @@ const Teachers = () => {
                     </SelectContent>
                   </Select>
                 </div>
-              <div>
-                <Label className="font-semibold">Assigned Courses</Label>
-                <div className="space-y-3 mt-3">
-                  {form.assignedCourses.map((ac, idx) => (
-                    <div key={idx} className="space-y-2 p-4 border rounded-lg bg-muted/30 transition-colors hover:bg-muted/40">
-                      <div className="flex items-start gap-2">
-                        <div className="relative flex-1">
-                          <Input
-                            placeholder="Search course e.g., ITC111"
-                            value={ac.course}
-                            onChange={(e) => updateCourseCode(idx, e.target.value)}
-                            onFocus={() => setFocusedCourseIdx(idx)}
-                            onBlur={() => setTimeout(() => setFocusedCourseIdx((v) => (v === idx ? null : v)), 150)}
-                            className="w-full"
-                          />
-                          {focusedCourseIdx === idx && ac.course && (
-                            <div className="absolute z-20 top-full left-0 mt-1 w-full max-h-64 overflow-y-auto bg-popover border border-border rounded-md shadow-lg">
-                              {getCourseSuggestions(ac.course).map((c) => (
-                                <div
-                                  key={c.code}
-                                  className="p-3 hover:bg-muted/60 cursor-pointer transition-colors border-b border-border/50 last:border-0"
-                                  onMouseDown={() => { setCourseFromSuggestion(idx, c); setFocusedCourseIdx(null); }}
-                                >
-                                  <div className="font-semibold text-sm">{c.code}</div>
-                                  <div className="text-sm text-foreground/90">{c.title}</div>
-                                  <div className="text-xs text-muted-foreground">{c.units} units</div>
-                                </div>
-                              ))}
-                              {getCourseSuggestions(ac.course).length === 0 && (
-                                <div className="p-4 text-center text-sm text-muted-foreground">
-                                  No courses found
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                        <Button variant="ghost" size="icon" className="shrink-0 text-destructive hover:text-destructive" onClick={() => removeCourseRow(idx)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                      {ac.course && (
-                        <div className="space-y-3 w-full">
-                          <div className="flex items-center justify-between gap-4">
-                            <div>
-                              <p className="font-semibold text-sm text-foreground">{ac.course}{ac.title ? ` — ${ac.title}` : ''}</p>
-                              {ac.units !== undefined && <p className="text-xs text-muted-foreground">{ac.units} units</p>}
-                            </div>
-                            <div className="w-40">
-                              <Select value={ac.yearLevel || '1st Year'} onValueChange={(v) => updateAssignedCourseYearLevel(idx, v)}>
-                                <SelectTrigger className="mt-1">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="1st Year">1st Year</SelectItem>
-                                  <SelectItem value="2nd Year">2nd Year</SelectItem>
-                                  <SelectItem value="3rd Year">3rd Year</SelectItem>
-                                  <SelectItem value="4th Year">4th Year</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          </div>
 
-                          <div className="flex items-center gap-3 flex-wrap">
-                            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Sections:</span>
-                            <div className="flex gap-2 flex-wrap">
-                              {(sections.length ? sections.map((sec) => sec.name) : ["F1","F2","F3","F4","F5","F6"]).map((s) => {
-                                const active = ac.sections.includes(s);
-                                return (
-                                  <Button
-                                    key={s}
-                                    size="sm"
-                                    variant={active ? "default" : "outline"}
-                                    className="font-medium"
-                                    onClick={() => toggleSection(idx, s)}
-                                  >
-                                    {s}
-                                  </Button>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                  <Button onClick={addCourseRow} variant="outline" className="w-full">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Course
-                  </Button>
-                  <p className="text-xs text-muted-foreground">Assign courses and select sections (F1..F6)</p>
-                </div>
+              <div className="mt-4">
+                <Button
+                  variant="secondary"
+                  className="w-full justify-center"
+                  onClick={() => {
+                    setIsEditOpen(false);
+                    // Navigate to the teacher course assignment page (users path)
+                    navigate(`/admin/users/teachers/${selectedTeacherId}/courses`);
+                  }}
+                >
+                  <BookOpen className="h-4 w-4 mr-2" />
+                  Manage Courses
+                </Button>
               </div>
+
               <div className="flex gap-2 pt-4 border-t">
                 <Button className="flex-1 bg-gradient-to-r from-primary to-accent hover:from-primary hover:to-accent text-white font-semibold" onClick={handleEdit}>
                   Save Changes

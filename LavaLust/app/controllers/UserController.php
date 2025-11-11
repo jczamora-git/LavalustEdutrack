@@ -11,32 +11,6 @@ class UserController extends Controller
         $this->call->library('session');
     }
 
-    private function set_json_headers()
-    {
-        // Allow requests from React dev servers (ports 5174, 3000, or 5173)
-        $allowed_origins = [
-            'http://localhost:5174',
-            'http://localhost:3000',
-            'http://localhost:5173'
-        ];
-        
-        $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
-        
-        if (in_array($origin, $allowed_origins)) {
-            header("Access-Control-Allow-Origin: $origin");
-        }
-        
-        header('Content-Type: application/json');
-        header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
-        header('Access-Control-Allow-Headers: Content-Type, Authorization');
-        header('Access-Control-Allow-Credentials: true');
-        
-        if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-            http_response_code(200);
-            exit();
-        }
-    }
-
     public function register()
     {
         if ($this->io->method() === 'post') {
@@ -163,7 +137,7 @@ class UserController extends Controller
     // API Methods for JSON endpoints
     public function api_register()
     {
-        $this->set_json_headers();
+         api_set_json_headers();
         
         try {
             // Get raw POST data and decode JSON
@@ -262,7 +236,7 @@ class UserController extends Controller
 
     public function api_login()
     {
-        $this->set_json_headers();
+         api_set_json_headers();
         
         try {
             // Get raw POST data and decode JSON
@@ -326,7 +300,7 @@ class UserController extends Controller
 
     public function api_logout()
     {
-        $this->set_json_headers();
+         api_set_json_headers();
         
         try {
             // Destroy session
@@ -348,7 +322,7 @@ class UserController extends Controller
 
     public function me()
     {
-        $this->set_json_headers();
+         api_set_json_headers();
         
         // Check if user is logged in
         if (!$this->session->userdata('logged_in')) {
@@ -384,7 +358,7 @@ class UserController extends Controller
 
     public function check()
     {
-        $this->set_json_headers();
+         api_set_json_headers();
         
         $isAuthenticated = $this->session->userdata('logged_in') === true;
         
@@ -411,7 +385,7 @@ class UserController extends Controller
      */
     public function api_get_users()
     {
-        $this->set_json_headers();
+         api_set_json_headers();
         
         // Debug: Log session data
         error_log("Session data: " . json_encode([
@@ -484,7 +458,7 @@ class UserController extends Controller
      */
     public function api_get_user($id)
     {
-        $this->set_json_headers();
+         api_set_json_headers();
         
         // Check if user is admin
         if (!$this->session->userdata('logged_in') || $this->session->userdata('role') !== 'admin') {
@@ -530,8 +504,7 @@ class UserController extends Controller
      */
     public function api_create_user()
     {
-        $this->set_json_headers();
-        
+        api_set_json_headers();        
         // Check if user is admin
         if (!$this->session->userdata('logged_in') || $this->session->userdata('role') !== 'admin') {
             http_response_code(403);
@@ -643,7 +616,7 @@ class UserController extends Controller
      */
     public function api_update_user($id)
     {
-        $this->set_json_headers();
+         api_set_json_headers();
         
         // Check if user is admin
         if (!$this->session->userdata('logged_in') || $this->session->userdata('role') !== 'admin') {
@@ -763,8 +736,7 @@ class UserController extends Controller
      */
     public function api_delete_user($id)
     {
-        $this->set_json_headers();
-        
+         api_set_json_headers();
         // Check if user is admin
         if (!$this->session->userdata('logged_in') || $this->session->userdata('role') !== 'admin') {
             http_response_code(403);

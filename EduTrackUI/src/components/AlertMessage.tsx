@@ -1,5 +1,5 @@
+import React, { useEffect } from "react";
 import { Check, AlertCircle, X } from "lucide-react";
-import { useEffect } from "react";
 
 interface AlertMessageProps {
   type: "success" | "error" | "info";
@@ -44,7 +44,10 @@ export const AlertMessage = ({
       <Icon className="h-5 w-5 flex-shrink-0" />
       <span className="text-sm font-medium">{message}</span>
       <button
+        type="button"
         onClick={onClose}
+        title="Close"
+        aria-label="Close message"
         className="ml-2 flex-shrink-0 hover:opacity-70 transition-opacity"
       >
         <X className="h-4 w-4" />

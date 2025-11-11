@@ -137,13 +137,54 @@ class TeacherModel extends Model
     }
 
     /**
-     * Get assigned courses for a teacher (stub method)
+     * Get assigned courses for a teacher
+     * Returns array of assigned courses with sections
      */
     public function get_assigned_courses($teacherId)
     {
-        // This would typically query a teacher_courses table
-        // For now returning empty array as the schema wasn't provided
-        return [];
+        // Get all teacher_subjects for this teacher
+        $assignments = $this->db->table('teacher_subjects')
+                                ->select('teacher_subjects.id as teacher_subject_id, teacher_subjects.subject_id')
+                                ->where('teacher_subjects.teacher_id', $teacherId)
+                                ->get_all();
+
+        if (empty($assignments)) {
+            return [];
+        }
+
+        $result = [];
+        foreach ($assignments as $a) {
+            // Get subject details
+            $subject = $this->db->table('subjects')
+                              ->select('id, course_code, course_name, credits, category, year_level, semester')
+                              ->where('id', $a['subject_id'])
+                              ->get();
+
+            if (empty($subject)) continue;
+
+            // Get sections for this assignment
+            $sections = $this->db->table('teacher_subject_sections')
+                              ->join('sections', 'teacher_subject_sections.section_id = sections.id')
+                              ->select('sections.id, sections.name, sections.description')
+                              ->where('teacher_subject_sections.teacher_subject_id', $a['teacher_subject_id'])
+                              ->get_all();
+
+            $section_names = [];
+            foreach ($sections as $s) {
+                $section_names[] = $s['name'];
+            }
+
+            $result[] = [
+                'course' => $subject['course_code'],
+                'title' => $subject['course_name'],
+                'units' => $subject['credits'],
+                'sections' => $section_names,
+                'yearLevel' => $subject['year_level'],
+                'teacher_subject_id' => $a['teacher_subject_id']
+            ];
+        }
+
+        return $result;
     }
 
     /**
@@ -244,22 +285,124 @@ class TeacherModel extends Model
     }
 
     /**
-     * Assign course to teacher (stub method)
+     * Assign course to teacher with sections
+     * @param int $teacherId
+     * @param string $courseCode Subject course_code
+     * @param string $sections Comma-separated section names (e.g., "F1,F2,F3")
      */
     public function assign_course($teacherId, $courseCode, $sections)
     {
-        // This would insert into a teacher_courses table
-        // Implementation depends on your course management schema
+        // Find subject by course_code
+        $subject = $this->db->table('subjects')
+                           ->select('id')
+                           ->where('course_code', $courseCode)
+                           ->get();
+
+        if (empty($subject) || empty($subject['id'])) {
+            return false;
+        }
+
+        $subject_id = $subject['id'];
+
+        // Create or get teacher_subject assignment
+        $ts_assignment = $this->db->table('teacher_subjects')
+                                  ->select('id')
+                                  ->where('teacher_id', $teacherId)
+                                  ->where('subject_id', $subject_id)
+                                  ->get();
+
+        if (!empty($ts_assignment) && isset($ts_assignment['id'])) {
+            $ts_id = $ts_assignment['id'];
+        } else {
+            // Insert new teacher_subject
+            $now = date('Y-m-d H:i:s');
+            $insert_result = $this->db->table('teacher_subjects')->insert([
+                'teacher_id' => $teacherId,
+                'subject_id' => $subject_id,
+                'created_at' => $now,
+                'updated_at' => $now
+            ]);
+
+            if (!$insert_result) {
+                return false;
+            }
+
+            $ts_id = $this->db->insert_id();
+        }
+
+        // Clear existing sections for this assignment
+        $this->db->table('teacher_subject_sections')
+                ->where('teacher_subject_id', $ts_id)
+                ->delete();
+
+        // Parse and add sections
+        if (!empty($sections)) {
+            $section_names = explode(',', $sections);
+            foreach ($section_names as $sname) {
+                $sname = trim($sname);
+                if (empty($sname)) continue;
+
+                // Find section by name
+                $section_row = $this->db->table('sections')
+                                       ->select('id')
+                                       ->where('name', $sname)
+                                       ->get();
+
+                if (!empty($section_row) && isset($section_row['id'])) {
+                    $this->db->table('teacher_subject_sections')->insert([
+                        'teacher_subject_id' => $ts_id,
+                        'section_id' => $section_row['id'],
+                        'created_at' => date('Y-m-d H:i:s'),
+                        'updated_at' => date('Y-m-d H:i:s')
+                    ]);
+                }
+            }
+        }
+
         return true;
     }
 
     /**
-     * Remove course assignment from teacher (stub method)
+     * Remove course assignment from teacher
+     * Deletes teacher_subject record and related section links
      */
     public function remove_course_assignment($teacherId, $courseCode)
     {
-        // This would delete from a teacher_courses table
-        // Implementation depends on your course management schema
-        return true;
+        // Find subject by course_code
+        $subject = $this->db->table('subjects')
+                           ->select('id')
+                           ->where('course_code', $courseCode)
+                           ->get();
+
+        if (empty($subject) || empty($subject['id'])) {
+            return false;
+        }
+
+        $subject_id = $subject['id'];
+
+        // Find teacher_subject assignment
+        $ts_assignment = $this->db->table('teacher_subjects')
+                                  ->select('id')
+                                  ->where('teacher_id', $teacherId)
+                                  ->where('subject_id', $subject_id)
+                                  ->get();
+
+        if (empty($ts_assignment) || !isset($ts_assignment['id'])) {
+            return true; // Already removed
+        }
+
+        $ts_id = $ts_assignment['id'];
+
+        // Delete section links first (foreign key cascade should handle this, but explicit is better)
+        $this->db->table('teacher_subject_sections')
+                ->where('teacher_subject_id', $ts_id)
+                ->delete();
+
+        // Delete teacher_subject assignment
+        $result = $this->db->table('teacher_subjects')
+                          ->where('id', $ts_id)
+                          ->delete();
+
+        return $result;
     }
 }

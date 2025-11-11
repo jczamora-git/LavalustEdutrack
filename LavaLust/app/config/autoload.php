@@ -72,7 +72,7 @@ defined('PREVENT_DIRECT_ACCESS') OR exit('No direct script access allowed');
 |
 |	$autoload['libraries'] = array('database', 'email', 'session');
 */
-$autoload['libraries'] = array('database');
+$autoload['libraries'] = array('database','session');
 
 /*
 | -------------------------------------------------------------------
@@ -82,7 +82,7 @@ $autoload['libraries'] = array('database');
 |
 |	$autoload['helpers'] = array('url', 'file');
 */
-$autoload['helpers'] = array('url');
+$autoload['helpers'] = array('url','api','spreadsheet');
 
 /*
 | -------------------------------------------------------------------
@@ -92,7 +92,16 @@ $autoload['helpers'] = array('url');
 |
 |	$autoload['models'] = array('model1_model', 'model2_model')
 */
-$autoload['models'] = array('UserModel','TeacherModel','StudentModel','SectionModel','TeacherSubjectModel','SubjectModel','YearLevelModel','YearLevelSectionModel');
+$autoload['models'] = array('UserModel',
+                        'TeacherModel',
+                        'StudentModel',
+                        'SectionModel',
+                        'TeacherSubjectModel',
+                        'SubjectModel',
+                        'YearLevelModel',
+                        'YearLevelSectionModel',
+                        'StudentSubjectModel',
+                    'ActivityModel',);
 
 /*
 | -------------------------------------------------------------------

@@ -8,10 +8,11 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Search, Edit, Trash2, Grid3x3, Users, List, ChevronDown, ChevronUp } from "lucide-react";
+import { Plus, Search, Edit, Trash2, Grid3x3, Users, List, ChevronDown, ChevronUp, DownloadCloud } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertMessage } from "@/components/AlertMessage";
-import { apiPost, apiGet, apiPut, apiDelete } from "@/lib/api";
+import { useConfirm } from "@/components/Confirm";
+import { apiPost, apiGet, apiPut, apiDelete, API_ENDPOINTS } from "@/lib/api";
 
 type Section = {
   id: string;
@@ -20,6 +21,7 @@ type Section = {
   status: "active" | "inactive";
   description: string;
   yearLevel?: string;
+  studentsCount?: number;
 };
 
 type YearLevel = {
@@ -45,6 +47,12 @@ const Sections = () => {
   // Mock mapping of year_level -> section names (this is the year_level_sections mapping)
   const [yearLevelSections, setYearLevelSections] = useState<Record<string, string[]>>({});
 
+  // Student counts by section id (total)
+  const [sectionStudentCounts, setSectionStudentCounts] = useState<Record<string, number>>({});
+
+  // Student counts by section id + year label key `${sectionId}|${yearLabel}`
+  const [sectionYearCounts, setSectionYearCounts] = useState<Record<string, number>>({});
+
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [createMode, setCreateMode] = useState<"manual" | "select">("manual");
   const [modalYearLabel, setModalYearLabel] = useState<string | null>(null);
@@ -67,6 +75,8 @@ const Sections = () => {
     setAlert({ type, message });
   };
 
+  const confirm = useConfirm();
+
   useEffect(() => {
     if (!isAuthenticated || user?.role !== "admin") {
       navigate("/auth");
@@ -88,13 +98,37 @@ const Sections = () => {
 
       if (sectionsData.success) {
         // Convert backend sections to frontend format
-        setSections(sectionsData.sections.map((s: any) => ({
+        const mapped = sectionsData.sections.map((s: any) => ({
           id: s.id.toString(),
           name: s.name,
-          students: [], // Students will be fetched separately when needed
+          students: [], // legacy placeholder
+          studentsCount: 0,
           status: s.status,
           description: s.description
-        })));
+        }));
+        setSections(mapped);
+
+        // Fetch student counts for each section (total)
+        try {
+          const counts = {} as Record<string, number>;
+          await Promise.all(mapped.map(async (sec) => {
+              try {
+              const res = await apiGet(`/api/students?section_id=${encodeURIComponent(sec.id)}`);
+              let arr: any[] = [];
+              if (Array.isArray(res)) arr = res as any[];
+              else if (res && res.data) arr = res.data;
+              else if (res && res.students) arr = res.students;
+              counts[sec.id] = Array.isArray(arr) ? arr.length : 0;
+            } catch (e) {
+              counts[sec.id] = 0;
+            }
+          }));
+          setSectionStudentCounts(counts);
+          // Also update sections array to include the count in-place for quick UI render
+          setSections((prev) => prev.map((p) => ({ ...p, studentsCount: counts[p.id] ?? 0 })));
+        } catch (err) {
+          console.error('Failed to fetch per-section student counts', err);
+        }
       }
 
       if (yearLevelsData.success) {
@@ -103,6 +137,38 @@ const Sections = () => {
 
       if (mappingsData.success) {
         setYearLevelSections(mappingsData.organized);
+        // After we have mappings and year levels, fetch per-section-per-year counts
+        try {
+          const countsByKey: Record<string, number> = {};
+          // Build list of fetch promises
+          const promises: Promise<void>[] = [];
+          for (const yl of (yearLevelsData.success ? yearLevelsData.year_levels : [])) {
+            const label = yl.name;
+            const sectionNames: string[] = (mappingsData.organized && mappingsData.organized[label]) || [];
+            for (const name of sectionNames) {
+              const sec = (sectionsData.success ? sectionsData.sections.find((s: any) => s.name === name) : null) as any;
+              if (!sec) continue;
+              const key = `${sec.id}|${label}`;
+              const p = (async () => {
+                try {
+                  const res = await apiGet(`/api/students?section_id=${encodeURIComponent(sec.id)}&year_level=${encodeURIComponent(label)}`);
+                  let arr: any[] = [];
+                  if (Array.isArray(res)) arr = res as any[];
+                  else if (res && res.data) arr = res.data;
+                  else if (res && res.students) arr = res.students;
+                  countsByKey[key] = Array.isArray(arr) ? arr.length : 0;
+                } catch (e) {
+                  countsByKey[key] = 0;
+                }
+              })();
+              promises.push(p);
+            }
+          }
+          await Promise.all(promises);
+          setSectionYearCounts(countsByKey);
+        } catch (err) {
+          console.error('Failed to fetch per-section-per-year counts', err);
+        }
       }
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -284,7 +350,15 @@ const Sections = () => {
   const handleDeactivateSection = async (id: string) => {
     const s = sections.find((x) => x.id === id);
     if (!s) return;
-    if (!confirm(`Deactivate section ${s.name}? This will mark it as inactive.`)) return;
+    const ok = await confirm({
+      title: 'Deactivate section',
+      description: `Deactivate section ${s.name}? This will mark it as inactive.`,
+      emphasis: s.name,
+      confirmText: 'Deactivate',
+      cancelText: 'Cancel',
+      variant: 'destructive'
+    });
+    if (!ok) return;
 
     try {
       const data = await apiPut(`/api/sections/${id}`, { status: 'inactive' });
@@ -308,7 +382,15 @@ const Sections = () => {
     const yearLevel = yearLevels.find(yl => yl.id === yearLevelId);
     if (!s || !yearLevel) return;
     
-    if (!confirm(`Remove ${s.name} from ${yearLevel.name}? This will unassign the section from this year level.`)) return;
+    const ok = await confirm({
+      title: 'Remove section from year level',
+      description: `Remove ${s.name} from ${yearLevel.name}? This will unassign the section from this year level.`,
+      emphasis: s.name,
+      confirmText: 'Remove',
+      cancelText: 'Cancel',
+      variant: 'destructive'
+    });
+    if (!ok) return;
     
     try {
       const data = await apiDelete(`/api/year-levels/${yearLevelId}/sections/${sectionId}`);
@@ -332,7 +414,15 @@ const Sections = () => {
   const handleDelete = async (id: string) => {
     const s = sections.find((x) => x.id === id);
     if (!s) return;
-    if (!confirm(`Delete section ${s.name} permanently? This action cannot be undone and will remove all associated data.`)) return;
+    const ok = await confirm({
+      title: 'Delete section permanently',
+      description: `Delete section ${s.name} permanently? This action cannot be undone and will remove all associated data.`,
+      emphasis: s.name,
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      variant: 'destructive'
+    });
+    if (!ok) return;
     
     try {
       const data = await apiDelete(`/api/sections/${id}`);
@@ -452,7 +542,7 @@ const Sections = () => {
                             <p className="text-xs text-muted-foreground">{sec.description}</p>
                           </div>
                         </div>
-                        <div className="text-xs text-muted-foreground mt-2">Students: {sec.students.length}</div>
+                        <div className="text-xs text-muted-foreground mt-2">Students: {sec.studentsCount ?? sectionStudentCounts[sec.id] ?? 0}</div>
                       </div>
                       <div className="mt-3 flex gap-2">
                         <Button
@@ -511,7 +601,9 @@ const Sections = () => {
                           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                             {(yearLevelSections[lvl.label] || []).map((name) => {
                               const sec = findSectionByName(name);
-                              const studentsCount = sec ? sec.students.length : 0;
+                              const studentsCount = sec
+                                ? (sectionYearCounts[`${sec.id}|${lvl.label}`] ?? sectionStudentCounts[sec.id] ?? sec.studentsCount ?? 0)
+                                : 0;
                               const status = sec ? sec.status : "active";
                               return (
                                 <div key={name} className={`rounded-xl border p-4 flex flex-col justify-between ${status === "inactive" ? "opacity-60 bg-muted/50" : "bg-card"}`}>
@@ -528,19 +620,81 @@ const Sections = () => {
                                     <div className="text-sm text-muted-foreground">{studentsCount} Students</div>
                                   </div>
                                   <div className="mt-4 flex gap-2">
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => {
-                                        if (sec) {
-                                          navigate(`/admin/users/sections/${sec.id}`, { state: { section: sec } });
-                                        }
-                                      }}
-                                      className="flex-1"
-                                    >
-                                      <Edit className="h-4 w-4" />
-                                      Manage
-                                    </Button>
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => {
+                                              if (sec) {
+                                                // Pass the year level label so SectionDetail can show a prefixed title (e.g., "1-F1")
+                                                navigate(`/admin/users/sections/${sec.id}`, { state: { section: sec, yearLevel: lvl.label } });
+                                              }
+                                            }}
+                                            className="flex-1"
+                                          >
+                                            <Edit className="h-4 w-4" />
+                                            Manage
+                                          </Button>
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={async () => {
+                                              if (!sec) return;
+                                              try {
+                                                // Fetch students for this section and year level
+                                                const url = `/api/students?section_id=${encodeURIComponent(sec.id)}&year_level=${encodeURIComponent(lvl.label)}`;
+                                                const res = await apiGet(url);
+                                                let rows: any[] = [];
+                                                if (Array.isArray(res)) rows = res as any[];
+                                                else if (res && res.data) rows = res.data;
+                                                else if (res && res.students) rows = res.students;
+
+                                                // Build CSV (comma-separated) with proper quoting
+                                                const headers = ['Student ID', 'First Name', 'Last Name', 'Email', 'Section', 'Year Level'];
+
+                                                const escapeCsv = (v: any) => {
+                                                  const s = v === null || typeof v === 'undefined' ? '' : String(v);
+                                                  // Double-up quotes and wrap in quotes
+                                                  return `"${s.replace(/"/g, '""')}"`;
+                                                };
+
+                                                const csvRows: string[] = [];
+                                                csvRows.push(headers.map(escapeCsv).join(','));
+
+                                                for (const r of rows) {
+                                                  const studentId = r.student_id ?? r.studentId ?? r.id ?? '';
+                                                  const first = r.first_name ?? r.firstName ?? (r.name ? String(r.name).split(' ')[0] : '') ?? '';
+                                                  const last = r.last_name ?? r.lastName ?? (r.name ? String(r.name).split(' ').slice(1).join(' ') : '') ?? '';
+                                                  const email = r.email ?? r.user_email ?? '';
+                                                  const sectionName = sec.name ?? (r.section_name ?? r.section ?? '');
+                                                  const yearLabel = lvl.label;
+
+                                                  const row = [studentId, first, last, email, sectionName, yearLabel].map((c) => escapeCsv(c));
+                                                  csvRows.push(row.join(','));
+                                                }
+
+                                                const csvContent = '\uFEFF' + csvRows.join('\n'); // BOM for Excel
+                                                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                                                const urlBlob = window.URL.createObjectURL(blob);
+                                                const a = document.createElement('a');
+                                                a.href = urlBlob;
+                                                const now = new Date();
+                                                const fname = `students_${sec.name}_${lvl.label.replace(/\s+/g, '')}_${now.toISOString().slice(0,19).replace(/[:T]/g, '-')}.csv`;
+                                                a.download = fname;
+                                                document.body.appendChild(a);
+                                                a.click();
+                                                a.remove();
+                                                window.URL.revokeObjectURL(urlBlob);
+                                              } catch (err) {
+                                                console.error('Failed to export students for section', sec, err);
+                                                showAlert('error', 'Failed to export students');
+                                              }
+                                            }}
+                                            className="flex items-center gap-2"
+                                            title={`Export students for ${lvl.label} - ${name}`}
+                                          >
+                                            <DownloadCloud className="h-4 w-4" />
+                                            Export
+                                          </Button>
                                     <Button
                                       variant="outline"
                                       size="sm"

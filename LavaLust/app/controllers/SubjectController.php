@@ -6,35 +6,9 @@ class SubjectController extends Controller
     public function __construct()
     {
         parent::__construct();
-        $this->call->database();
-        $this->call->model('SubjectModel');
-        $this->call->library('session');
     }
 
-    private function set_json_headers()
-    {
-        $allowed_origins = [
-            'http://localhost:5174',
-            'http://localhost:3000',
-            'http://localhost:5173'
-        ];
-
-        $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
-        if (in_array($origin, $allowed_origins)) {
-            header("Access-Control-Allow-Origin: $origin");
-        }
-
-        header('Content-Type: application/json');
-        header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
-        header('Access-Control-Allow-Headers: Content-Type, Authorization');
-        header('Access-Control-Allow-Credentials: true');
-
-        if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-            http_response_code(200);
-            exit();
-        }
-    }
-
+    
     private function is_admin()
     {
         return $this->session->userdata('logged_in') === true && 
@@ -46,7 +20,7 @@ class SubjectController extends Controller
      */
     public function api_get_subjects()
     {
-        $this->set_json_headers();
+         api_set_json_headers();
 
         if (!$this->is_admin()) {
             http_response_code(403);
@@ -86,7 +60,7 @@ class SubjectController extends Controller
      */
     public function api_get_subject($id)
     {
-        $this->set_json_headers();
+         api_set_json_headers();
 
         if (!$this->is_admin()) {
             http_response_code(403);
@@ -114,7 +88,7 @@ class SubjectController extends Controller
      */
     public function api_create_subject()
     {
-        $this->set_json_headers();
+         api_set_json_headers();
 
         if (!$this->is_admin()) {
             http_response_code(403);
@@ -128,7 +102,7 @@ class SubjectController extends Controller
 
             $course_code = trim($data['course_code'] ?? '');
             $course_name = trim($data['course_name'] ?? '');
-            $description = $data['description'] ?? null;
+            // description field removed from subjects table
             $credits = isset($data['credits']) ? (int)$data['credits'] : 3;
             $category = $data['category'] ?? 'Major';
             $year_level = $data['year_level'] ?? '1st Year';
@@ -150,7 +124,6 @@ class SubjectController extends Controller
             $subjectId = $this->SubjectModel->create([
                 'course_code' => $course_code,
                 'course_name' => $course_name,
-                'description' => $description,
                 'credits' => $credits,
                 'category' => $category,
                 'year_level' => $year_level,
@@ -179,7 +152,7 @@ class SubjectController extends Controller
      */
     public function api_update_subject($id)
     {
-        $this->set_json_headers();
+         api_set_json_headers();
 
         if (!$this->is_admin()) {
             http_response_code(403);
@@ -200,7 +173,7 @@ class SubjectController extends Controller
 
             $course_code = isset($data['course_code']) ? trim($data['course_code']) : $existing['course_code'];
             $course_name = isset($data['course_name']) ? trim($data['course_name']) : $existing['course_name'];
-            $description = $data['description'] ?? $existing['description'];
+            // description removed from subjects table; do not attempt to read or write it
             $credits = isset($data['credits']) ? (int)$data['credits'] : $existing['credits'];
             $category = $data['category'] ?? $existing['category'];
             $year_level = $data['year_level'] ?? $existing['year_level'];
@@ -222,7 +195,6 @@ class SubjectController extends Controller
             $updated = $this->SubjectModel->update_subject($id, [
                 'course_code' => $course_code,
                 'course_name' => $course_name,
-                'description' => $description,
                 'credits' => $credits,
                 'category' => $category,
                 'year_level' => $year_level,
@@ -249,7 +221,7 @@ class SubjectController extends Controller
      */
     public function api_delete_subject($id)
     {
-        $this->set_json_headers();
+         api_set_json_headers();
 
         if (!$this->is_admin()) {
             http_response_code(403);

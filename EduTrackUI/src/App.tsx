@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import { AuthProvider } from "./hooks/useAuth";
+import { ConfirmProvider } from "@/components/Confirm";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
@@ -23,7 +24,9 @@ import Payments from "./pages/admin/Payments";
 import PDFGeneration from "./pages/admin/PDFGeneration";
 import AdminSettings from "./pages/admin/AdminSettings";
 import Teachers from "./pages/admin/users/Teachers";
+import TeacherCourseAssignment from "./pages/admin/users/TeacherCourseAssignment";
 import Students from "./pages/admin/users/Students";
+import StudentCourseAssignment from "./pages/admin/users/StudentCourseAssignment";
 import Subjects from "./pages/admin/users/Subjects";
 import Sections from "./pages/admin/users/Sections";
 import SectionDetail from "./pages/admin/users/SectionDetail";
@@ -64,6 +67,7 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <AuthProvider>
+          <ConfirmProvider>
           <Routes>
             <Route path="/" element={<Auth />} />
             <Route path="/auth" element={<Auth />} />
@@ -95,7 +99,11 @@ const App = () => (
             <Route path="/admin/dashboard" element={<ProtectedRoute requiredRole="admin"><AdminDashboard /></ProtectedRoute>} />
             <Route path="/admin/users" element={<ProtectedRoute requiredRole="admin"><UserManagement /></ProtectedRoute>} />
             <Route path="/admin/users/teachers" element={<ProtectedRoute requiredRole="admin"><Teachers /></ProtectedRoute>} />
+            <Route path="/admin/teachers/:teacherId/courses" element={<ProtectedRoute requiredRole="admin"><TeacherCourseAssignment /></ProtectedRoute>} />
+            {/* New route to match users path used in UI */}
+            <Route path="/admin/users/teachers/:teacherId/courses" element={<ProtectedRoute requiredRole="admin"><TeacherCourseAssignment /></ProtectedRoute>} />
             <Route path="/admin/users/students" element={<ProtectedRoute requiredRole="admin"><Students /></ProtectedRoute>} />
+            <Route path="/admin/users/students/:studentId/courses" element={<ProtectedRoute requiredRole="admin"><StudentCourseAssignment /></ProtectedRoute>} />
             <Route path="/admin/users/subjects" element={<ProtectedRoute requiredRole="admin"><Subjects /></ProtectedRoute>} />
             <Route path="/admin/users/sections" element={<ProtectedRoute requiredRole="admin"><Sections /></ProtectedRoute>} />
             <Route path="/admin/users/sections/:sectionId" element={<ProtectedRoute requiredRole="admin"><SectionDetail /></ProtectedRoute>} />
@@ -109,7 +117,8 @@ const App = () => (
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
-        </AuthProvider>
+      </ConfirmProvider>
+      </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
   </ThemeProvider>

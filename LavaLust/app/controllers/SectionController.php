@@ -6,35 +6,7 @@ class SectionController extends Controller
     public function __construct()
     {
         parent::__construct();
-        $this->call->database();
-        $this->call->model('SectionModel');
-        $this->call->model('YearLevelModel');
-        $this->call->model('YearLevelSectionModel');
         $this->call->library('session');
-    }
-
-    private function set_json_headers()
-    {
-        $allowed_origins = [
-            'http://localhost:5174',
-            'http://localhost:3000',
-            'http://localhost:5173'
-        ];
-
-        $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
-        if (in_array($origin, $allowed_origins)) {
-            header("Access-Control-Allow-Origin: $origin");
-        }
-
-        header('Content-Type: application/json');
-        header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
-        header('Access-Control-Allow-Headers: Content-Type, Authorization');
-        header('Access-Control-Allow-Credentials: true');
-
-        if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-            http_response_code(200);
-            exit();
-        }
     }
 
     private function is_admin()
@@ -48,7 +20,7 @@ class SectionController extends Controller
      */
     public function api_get_sections()
     {
-        $this->set_json_headers();
+        api_set_json_headers();
 
         // Only admin should list sections
         if (!$this->is_admin()) {
@@ -89,7 +61,7 @@ class SectionController extends Controller
      */
     public function api_get_section($id)
     {
-        $this->set_json_headers();
+        api_set_json_headers();
 
         if (!$this->is_admin()) {
             http_response_code(403);
@@ -117,7 +89,7 @@ class SectionController extends Controller
      */
     public function api_create_section()
     {
-        $this->set_json_headers();
+        api_set_json_headers();
 
         if (!$this->is_admin()) {
             http_response_code(403);
@@ -168,7 +140,7 @@ class SectionController extends Controller
      */
     public function api_update_section($id)
     {
-        $this->set_json_headers();
+        api_set_json_headers();
 
         if (!$this->is_admin()) {
             http_response_code(403);
@@ -224,7 +196,7 @@ class SectionController extends Controller
      */
     public function api_delete_section($id)
     {
-        $this->set_json_headers();
+        api_set_json_headers();
 
         if (!$this->is_admin()) {
             http_response_code(403);
@@ -260,7 +232,7 @@ class SectionController extends Controller
      */
     public function api_get_year_levels()
     {
-        $this->set_json_headers();
+        api_set_json_headers();
 
         if (!$this->is_admin()) {
             http_response_code(403);
@@ -288,7 +260,7 @@ class SectionController extends Controller
      */
     public function api_get_year_level_sections($yearLevelId)
     {
-        $this->set_json_headers();
+        api_set_json_headers();
 
         if (!$this->is_admin()) {
             http_response_code(403);
@@ -324,7 +296,7 @@ class SectionController extends Controller
      */
     public function api_get_all_year_level_sections()
     {
-        $this->set_json_headers();
+        api_set_json_headers();
 
         if (!$this->is_admin()) {
             http_response_code(403);
@@ -362,7 +334,7 @@ class SectionController extends Controller
      */
     public function api_assign_section_to_year_level($yearLevelId, $sectionId)
     {
-        $this->set_json_headers();
+        api_set_json_headers();
 
         if (!$this->is_admin()) {
             http_response_code(403);
@@ -421,7 +393,7 @@ class SectionController extends Controller
      */
     public function api_unassign_section_from_year_level($yearLevelId, $sectionId)
     {
-        $this->set_json_headers();
+        api_set_json_headers();
 
         if (!$this->is_admin()) {
             http_response_code(403);
@@ -458,7 +430,7 @@ class SectionController extends Controller
      */
     public function api_create_section_with_year_level()
     {
-        $this->set_json_headers();
+         api_set_json_headers();
 
         if (!$this->is_admin()) {
             http_response_code(403);

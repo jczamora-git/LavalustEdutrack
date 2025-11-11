@@ -14,8 +14,8 @@ class SubjectModel extends Model
      */
     public function get_all($filters = [])
     {
-        $query = $this->db->table($this->table)
-                          ->select('id, course_code, course_name, description, credits, category, year_level, semester, status, created_at, updated_at');
+    $query = $this->db->table($this->table)
+              ->select('id, course_code, course_name, credits, category, year_level, semester, status, created_at, updated_at');
 
         if (!empty($filters['status'])) {
             $query = $query->where('status', $filters['status']);
@@ -38,7 +38,7 @@ class SubjectModel extends Model
             $query = $query->where_group_start();
             $query = $query->like('course_code', $search);
             $query = $query->or_like('course_name', $search);
-            $query = $query->or_like('description', $search);
+            // description column removed from subjects table; search only course_code and course_name
             $query = $query->where_group_end();
         }
 
@@ -50,10 +50,10 @@ class SubjectModel extends Model
      */
     public function get_subject($id)
     {
-        return $this->db->table($this->table)
-                        ->select('id, course_code, course_name, description, credits, category, year_level, semester, status, created_at, updated_at')
-                        ->where('id', $id)
-                        ->get();
+    return $this->db->table($this->table)
+            ->select('id, course_code, course_name, credits, category, year_level, semester, status, created_at, updated_at')
+            ->where('id', $id)
+            ->get();
     }
 
     public function find_by_id($id)
@@ -66,10 +66,10 @@ class SubjectModel extends Model
      */
     public function find_by_course_code($code)
     {
-        return $this->db->table($this->table)
-                        ->select('id, course_code, course_name, description, credits, category, year_level, semester, status, created_at, updated_at')
-                        ->where('course_code', $code)
-                        ->get();
+    return $this->db->table($this->table)
+            ->select('id, course_code, course_name, credits, category, year_level, semester, status, created_at, updated_at')
+            ->where('course_code', $code)
+            ->get();
     }
 
     /**
@@ -97,7 +97,7 @@ class SubjectModel extends Model
         $insert = [
             'course_code' => $data['course_code'] ?? '',
             'course_name' => $data['course_name'] ?? '',
-            'description' => $data['description'] ?? null,
+            // description removed from subjects table
             'credits' => $data['credits'] ?? 3,
             'category' => $data['category'] ?? 'Major',
             'year_level' => $data['year_level'] ?? '1st Year',
@@ -127,7 +127,7 @@ class SubjectModel extends Model
     {
         $data['updated_at'] = date('Y-m-d H:i:s');
 
-        $allowed = ['course_code','course_name','description','credits','category','year_level','semester','status','updated_at'];
+    $allowed = ['course_code','course_name','credits','category','year_level','semester','status','updated_at'];
         $updateData = [];
         foreach ($data as $k => $v) {
             if (in_array($k, $allowed)) {

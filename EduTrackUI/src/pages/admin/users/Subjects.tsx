@@ -11,12 +11,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus, Search, Edit, Trash2, BookOpen, ArrowUpDown, LayoutGrid, List } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertMessage } from "@/components/AlertMessage";
+import { useConfirm } from "@/components/Confirm";
+import { API_ENDPOINTS, apiGet, apiPost, apiPut } from "@/lib/api";
+import { Pagination } from "@/components/Pagination";
 
 type Subject = {
   id: string;
   code: string;
   name: string;
-  description: string;
   credits: number;
   category: "general_education" | "major" | "elective";
   yearLevel: number;
@@ -29,22 +31,17 @@ const Subjects = () => {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [semesterFilter, setSemesterFilter] = useState<string>("all");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
-  // Seed subjects focusing on Information Technology (based on provided sheet)
-  const [subjects, setSubjects] = useState<Subject[]>([
-    { id: "itp111", code: "ITP 111", name: "Fundamentals of IT", description: "Introductory IT concepts", credits: 3, category: "major", yearLevel: 1, semester: "1st", status: "active" },
-    { id: "itc111", code: "ITC 111", name: "Computer Fundamentals", description: "Basic computer concepts and operations", credits: 3, category: "major", yearLevel: 1, semester: "1st", status: "active" },
-    { id: "itp121", code: "ITP 121", name: "Programming I", description: "Introduction to programming", credits: 3, category: "major", yearLevel: 1, semester: "2nd", status: "active" },
-    { id: "itc121", code: "ITC 121", name: "Web Fundamentals", description: "HTML/CSS basics", credits: 3, category: "major", yearLevel: 1, semester: "2nd", status: "active" },
-    { id: "itp221", code: "ITP 221", name: "Data Structures", description: "Data organization and manipulation", credits: 3, category: "major", yearLevel: 2, semester: "2nd", status: "active" },
-    { id: "itp222", code: "ITP 222", name: "Database Systems", description: "Intro to database design and SQL", credits: 3, category: "major", yearLevel: 2, semester: "2nd", status: "active" },
-    { id: "itp311", code: "ITP 311", name: "Software Engineering", description: "Software dev lifecycle and practices", credits: 3, category: "major", yearLevel: 3, semester: "1st", status: "active" },
-    { id: "itp321", code: "ITP 321", name: "Networking Basics", description: "Fundamentals of computer networks", credits: 3, category: "major", yearLevel: 3, semester: "2nd", status: "active" },
-    { id: "itp411", code: "ITP 411", name: "Capstone Project", description: "Final year project and integration", credits: 6, category: "major", yearLevel: 4, semester: "2nd", status: "active" },
-    { id: "ite412", code: "ITE 412", name: "IT Elective A", description: "Specialized elective", credits: 3, category: "elective", yearLevel: 4, semester: "1st", status: "active" },
-  ]);
+  // Subjects loaded from backend
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+
+  // Pagination
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const itemsPerPage = 10;
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -52,7 +49,6 @@ const Subjects = () => {
   const [form, setForm] = useState<Omit<Subject, "id">>({
     code: "",
     name: "",
-    description: "",
     credits: 3,
     category: "major",
     yearLevel: 1,
@@ -66,24 +62,80 @@ const Subjects = () => {
     setAlert({ type, message });
   };
 
+  const confirm = useConfirm();
+
   useEffect(() => {
     if (!isAuthenticated || user?.role !== "admin") {
       navigate("/auth");
     }
   }, [isAuthenticated, user, navigate]);
 
+  // Fetch subjects from backend when authorized
+  useEffect(() => {
+    const load = async () => {
+      if (!isAuthenticated || user?.role !== 'admin') return;
+      setIsLoading(true);
+      try {
+        const res = await apiGet(API_ENDPOINTS.SUBJECTS);
+        // support different shapes: { success, subjects }, { data }, or array
+        if (!res) return;
+        // Normalizer to ensure required fields exist (prevents runtime errors like localeCompare on undefined)
+          const normalize = (s: any): Subject => ({
+          id: String(s.id ?? s.subject_id ?? s.code ?? Date.now()),
+          code: s.code ?? s.course_code ?? s.subject_code ?? "",
+          name: s.name ?? s.subject_name ?? s.course_name ?? s.title ?? "",
+          credits: Number.isFinite(Number(s.credits ?? s.units ?? 3)) ? Number(s.credits ?? s.units ?? 3) : 3,
+          category: (s.category as any) ?? s.type ?? "major",
+          yearLevel: Number(s.yearLevel ?? s.year_level ?? s.year ?? 1) || 1,
+          // Normalize semester values from backend like "1st Semester" to short values used by the UI ("1st"/"2nd")
+          semester: (() => {
+            const raw = String(s.semester ?? s.sem ?? "").toLowerCase();
+            if (raw.includes("1st") || raw.includes("1")) return "1st";
+            if (raw.includes("2nd") || raw.includes("2")) return "2nd";
+            return "1st";
+          })(),
+          status: (s.status ?? s.state ?? "active") as "active" | "inactive",
+        });
+
+        const arr = Array.isArray(res) ? res : res.subjects ?? res.data ?? [];
+        const mapped = (arr || []).map((it: any) => normalize(it));
+        setSubjects(mapped as Subject[]);
+      } catch (err: any) {
+        console.error('Failed to load subjects', err);
+        showAlert('error', err?.message || 'Failed to load subjects');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    load();
+  }, [isAuthenticated, user]);
+
   const filteredSubjects = subjects.filter((s) => {
     const q = searchQuery.trim().toLowerCase();
     const matchesQuery = q === "" || s.name.toLowerCase().includes(q) || s.code.toLowerCase().includes(q);
     const matchesCategory = categoryFilter === "all" || s.category === categoryFilter;
-    return matchesQuery && matchesCategory;
+    const matchesSemester = semesterFilter === "all" || s.semester === semesterFilter;
+    return matchesQuery && matchesCategory && matchesSemester;
   });
+
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, categoryFilter, semesterFilter]);
+
+  // Clamp currentPage to valid pages
+  const totalItems = filteredSubjects.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+  }, [currentPage, totalPages]);
+
+  const pagedSubjects = filteredSubjects.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   const handleOpenCreate = () => {
     setForm({
       code: "",
       name: "",
-      description: "",
       credits: 3,
       category: "major",
       yearLevel: 1,
@@ -98,10 +150,48 @@ const Subjects = () => {
       showAlert("error", "Course code and name are required");
       return;
     }
-    const newSubject: Subject = { id: Date.now().toString(), ...form };
-    setSubjects((s) => [newSubject, ...s]);
-    setIsCreateOpen(false);
-    showAlert("success", `Subject ${form.code} created`);
+    (async () => {
+      try {
+        const payload = {
+          course_code: form.code.trim(),
+          course_name: form.name.trim(),
+          credits: form.credits,
+          category: form.category,
+          // template literal is always a string, no nullish fallback needed
+          year_level: `${form.yearLevel}st Year`,
+          semester: form.semester === '1st' ? '1st Semester' : '2nd Semester',
+          status: form.status,
+        };
+
+        const res = await apiPost(API_ENDPOINTS.SUBJECTS, payload);
+        // accept res.subject, res.data, or array
+        const created = res && (res.subject || res.data || res) ? (res.subject || res.data || res) : null;
+        // normalize created if present
+        if (created && (created.id || created.course_code)) {
+          const normalized = {
+            id: String(created.id ?? created.subject_id ?? created.course_code),
+            code: created.course_code ?? created.code ?? '',
+            name: created.course_name ?? created.name ?? '',
+            credits: created.credits ?? created.units ?? 3,
+            category: created.category ?? 'major',
+            yearLevel: Number(created.year_level?.toString().charAt(0)) || form.yearLevel,
+            semester: created.semester?.includes('2') ? '2nd' : '1st',
+            status: created.status ?? 'active',
+          } as Subject;
+          setSubjects((s) => [normalized, ...s]);
+        } else {
+          // fallback local add
+          const newSubject: Subject = { id: String(Date.now()), ...form } as Subject;
+          setSubjects((s) => [newSubject, ...s]);
+        }
+
+        setIsCreateOpen(false);
+        showAlert('success', `Subject ${form.code} created`);
+      } catch (err: any) {
+        console.error('Failed to create subject', err);
+        showAlert('error', err?.message || 'Failed to create subject');
+      }
+    })();
   };
 
   const handleOpenEdit = (s: Subject) => {
@@ -109,7 +199,6 @@ const Subjects = () => {
     setForm({
       code: s.code,
       name: s.name,
-      description: s.description,
       credits: s.credits,
       category: s.category,
       yearLevel: s.yearLevel,
@@ -121,24 +210,70 @@ const Subjects = () => {
 
   const handleEdit = () => {
     if (!selectedSubjectId) return;
-    setSubjects((prev) =>
-      prev.map((s) =>
-        s.id === selectedSubjectId
-          ? { ...s, ...form }
-          : s
-      )
-    );
-    setIsEditOpen(false);
-    setSelectedSubjectId(null);
-    showAlert("success", "Subject updated");
+    (async () => {
+      try {
+        const payload: any = {
+          course_code: form.code.trim(),
+          course_name: form.name.trim(),
+          credits: form.credits,
+          category: form.category,
+          year_level: `${form.yearLevel}st Year`,
+          semester: form.semester === '1st' ? '1st Semester' : '2nd Semester',
+          status: form.status,
+        };
+
+        const res = await apiPut(API_ENDPOINTS.SUBJECT_BY_ID(selectedSubjectId), payload);
+        const updated = res && (res.subject || res.data || res) ? (res.subject || res.data || res) : null;
+        if (updated) {
+          const mapped: Subject = {
+            id: String(updated.id ?? updated.subject_id ?? selectedSubjectId),
+            code: updated.course_code ?? updated.code ?? form.code,
+            name: updated.course_name ?? updated.name ?? form.name,
+            credits: updated.credits ?? form.credits,
+            category: updated.category ?? form.category,
+            yearLevel: Number(updated.year_level?.toString().charAt(0)) || form.yearLevel,
+            semester: updated.semester?.includes('2') ? '2nd' : '1st',
+            status: updated.status ?? form.status,
+          };
+          setSubjects((prev) => prev.map((s) => (s.id === selectedSubjectId ? mapped : s)));
+        } else {
+          setSubjects((prev) => prev.map((s) => (s.id === selectedSubjectId ? { ...s, ...form } : s)));
+        }
+
+        setIsEditOpen(false);
+        setSelectedSubjectId(null);
+        showAlert('success', 'Subject updated');
+      } catch (err: any) {
+        console.error('Failed to update subject', err);
+        showAlert('error', err?.message || 'Failed to update subject');
+      }
+    })();
   };
 
   const handleDelete = (id: string) => {
     const s = subjects.find((x) => x.id === id);
     if (!s) return;
-    if (!confirm(`Inactivate subject ${s.code} - ${s.name}? This will set the subject to INACTIVE status.`)) return;
-    setSubjects((prev) => prev.map((x) => (x.id === id ? { ...x, status: "inactive" } : x)));
-    showAlert("info", `Subject ${s.code} has been set to inactive`);
+    (async () => {
+      const ok = await confirm({
+        title: 'Inactivate subject',
+        description: `Inactivate subject ${s.code} - ${s.name}? This will set the subject to INACTIVE status.`,
+        emphasis: `${s.code} - ${s.name}`,
+        confirmText: 'Inactivate',
+        cancelText: 'Cancel',
+        variant: 'destructive'
+      });
+      if (!ok) return;
+
+      try {
+        // soft-delete via PUT status update
+        await apiPut(API_ENDPOINTS.SUBJECT_BY_ID(id), { status: 'inactive' });
+        setSubjects((prev) => prev.map((x) => (x.id === id ? { ...x, status: 'inactive' } : x)));
+        showAlert('info', `Subject ${s.code} has been set to inactive`);
+      } catch (err: any) {
+        console.error('Failed to inactivate subject', err);
+        showAlert('error', err?.message || 'Failed to inactivate subject');
+      }
+    })();
   };
 
   if (!isAuthenticated) return null;
@@ -162,6 +297,18 @@ const Subjects = () => {
                   <SelectItem value="general_education">General Ed</SelectItem>
                   <SelectItem value="major">Major</SelectItem>
                   <SelectItem value="elective">Elective</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="w-40">
+              <Select value={semesterFilter} onValueChange={setSemesterFilter}>
+                <SelectTrigger className="border-2 focus:border-accent-500 rounded-lg px-3 py-2 bg-background">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Semesters</SelectItem>
+                  <SelectItem value="1st">1st Semester</SelectItem>
+                  <SelectItem value="2nd">2nd Semester</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -221,7 +368,7 @@ const Subjects = () => {
           <CardContent className="p-6">
             <div className={viewMode === "grid" ? "grid grid-cols-1 lg:grid-cols-2 gap-6" : "space-y-4"}>
               {(() => {
-                const list = [...filteredSubjects];
+                const list = [...pagedSubjects];
                 // apply sort
                 list.sort((a, b) => (sortOrder === "asc" ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name)));
                 return list.map((subject) => {
@@ -249,9 +396,6 @@ const Subjects = () => {
                               </div>
                               <div>
                                 <p className="font-bold text-xl">{subject.code}</p>
-                                {subject.description && (
-                                  <p className="text-sm text-muted-foreground line-clamp-1">{subject.description}</p>
-                                )}
                               </div>
                             </div>
                             <Badge
@@ -386,6 +530,18 @@ const Subjects = () => {
           </CardContent>
         </Card>
 
+        {/* Pagination controls */}
+        {!isLoading && totalItems > 0 && (
+          <div className="mt-6 px-2">
+            <Pagination
+              currentPage={currentPage}
+              totalItems={totalItems}
+              itemsPerPage={itemsPerPage}
+              onPageChange={(p) => setCurrentPage(p)}
+            />
+          </div>
+        )}
+
         {/* Create Dialog */}
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto border-0 shadow-2xl">
@@ -425,16 +581,7 @@ const Subjects = () => {
                   className="mt-2 py-3 border-2 rounded-lg"
                 />
               </div>
-              <div>
-                <Label htmlFor="description" className="font-semibold">Description</Label>
-                <Input
-                  id="description"
-                  value={form.description}
-                  onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-                  placeholder="Brief course description"
-                  className="mt-2 py-3 border-2 rounded-lg"
-                />
-              </div>
+              
               <div className="grid grid-cols-3 gap-4">
                 <div>
                   <Label htmlFor="category" className="font-semibold">Category</Label>
@@ -523,15 +670,7 @@ const Subjects = () => {
                   className="mt-2 py-3 border-2 rounded-lg"
                 />
               </div>
-              <div>
-                <Label htmlFor="edit-description" className="font-semibold">Description</Label>
-                <Input
-                  id="edit-description"
-                  value={form.description}
-                  onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-                  className="mt-2 py-3 border-2 rounded-lg"
-                />
-              </div>
+              
               <div className="grid grid-cols-3 gap-4">
                 <div>
                   <Label htmlFor="edit-category" className="font-semibold">Category</Label>

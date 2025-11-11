@@ -6,37 +6,7 @@ class TeacherController extends Controller
     public function __construct()
     {
         parent::__construct();
-        $this->call->database();
-        $this->call->model('TeacherModel');
-        $this->call->library('session');
     }
-
-    private function set_json_headers()
-    {
-        // Allow requests from React dev servers (ports 5174, 3000, or 5173)
-        $allowed_origins = [
-            'http://localhost:5174',
-            'http://localhost:3000',
-            'http://localhost:5173'
-        ];
-        
-        $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
-        
-        if (in_array($origin, $allowed_origins)) {
-            header("Access-Control-Allow-Origin: $origin");
-        }
-        
-        header('Content-Type: application/json');
-        header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
-        header('Access-Control-Allow-Headers: Content-Type, Authorization');
-        header('Access-Control-Allow-Credentials: true');
-        
-        if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-            http_response_code(200);
-            exit();
-        }
-    }
-
     /**
      * Check if user is admin
      * @return bool
@@ -53,7 +23,7 @@ class TeacherController extends Controller
      */
     public function api_get_last_id()
     {
-        $this->set_json_headers();
+         api_set_json_headers();
         
         try {
             $year = $_GET['year'] ?? date('Y');
@@ -82,7 +52,7 @@ class TeacherController extends Controller
      */
     public function api_get_teachers()
     {
-        $this->set_json_headers();
+         api_set_json_headers();
         
         // Check if user is admin
         if (!$this->is_admin()) {
@@ -129,7 +99,7 @@ class TeacherController extends Controller
      */
     public function api_get_teacher($id)
     {
-        $this->set_json_headers();
+         api_set_json_headers();
         
         // Check if user is admin
         if (!$this->is_admin()) {
@@ -181,7 +151,7 @@ class TeacherController extends Controller
      */
     public function api_create_teacher()
     {
-        $this->set_json_headers();
+         api_set_json_headers();
         
         // Check if user is admin
         if (!$this->is_admin()) {
@@ -376,7 +346,7 @@ class TeacherController extends Controller
      */
     public function api_update_teacher($id)
     {
-        $this->set_json_headers();
+         api_set_json_headers();
         
         // Check if user is admin
         if (!$this->is_admin()) {
@@ -536,7 +506,7 @@ class TeacherController extends Controller
      */
     public function api_delete_teacher($id)
     {
-        $this->set_json_headers();
+         api_set_json_headers();
         
         // Check if user is admin
         if (!$this->is_admin()) {
@@ -591,7 +561,7 @@ class TeacherController extends Controller
      */
     public function api_teacher_stats()
     {
-        $this->set_json_headers();
+         api_set_json_headers();
         
         // Check if user is admin
         if (!$this->is_admin()) {

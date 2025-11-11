@@ -19,14 +19,32 @@ export const API_ENDPOINTS = {
   TEACHER_BY_ID: (id: string | number) => `${API_BASE_URL}/api/teachers/${id}`,
   TEACHER_STATS: `${API_BASE_URL}/api/teachers/stats`,
   
+  // Student Management
+  STUDENTS: `${API_BASE_URL}/api/students`,
+  STUDENT_BY_ID: (id: string | number) => `${API_BASE_URL}/api/students/${id}`,
+  STUDENTS_IMPORT: `${API_BASE_URL}/api/students/import`,
+  STUDENTS_EXPORT: `${API_BASE_URL}/api/students/export`,
+  
   // Subjects & Sections
   SUBJECTS: `${API_BASE_URL}/api/subjects`,
   SUBJECT_BY_ID: (id: string | number) => `${API_BASE_URL}/api/subjects/${id}`,
 
+  // Year levels & year_level_sections
+  YEAR_LEVELS: `${API_BASE_URL}/api/year-levels`,
+  YEAR_LEVEL_SECTIONS: `${API_BASE_URL}/api/year-level-sections`,
+
   // Teacher assignments
   TEACHER_ASSIGNMENTS: `${API_BASE_URL}/api/teacher-assignments`,
+  TEACHER_ASSIGNMENTS_BY_TEACHER: (teacher_id: string | number) => `${API_BASE_URL}/api/teacher-assignments/by-teacher/${teacher_id}`,
+  // Student subjects (enrollments)
+  STUDENT_SUBJECTS: `${API_BASE_URL}/api/student-subjects`,
   // Sections
   SECTIONS: `${API_BASE_URL}/api/sections`,
+
+  // Activities (Grade Transparency)
+  ACTIVITIES: `${API_BASE_URL}/api/activities`,
+  ACTIVITY_BY_ID: (id: string | number) => `${API_BASE_URL}/api/activities/${id}`,
+  ACTIVITY_GRADES: (id: string | number) => `${API_BASE_URL}/api/activities/${id}/grades`,
 };
 
 // API helper functions
@@ -150,3 +168,49 @@ export async function apiDelete(url: string) {
     return { success: true };
   }
 }
+
+/**
+ * Upload file (multipart/form-data)
+ * @param url API endpoint
+ * @param file File object to upload
+ * @param fieldName Form field name (default: 'file')
+ * @param additionalData Optional additional form fields
+ */
+export async function apiUploadFile(url: string, file: File, fieldName: string = 'file', additionalData?: Record<string, string>) {
+  const formData = new FormData();
+  formData.append(fieldName, file);
+
+  // Add any additional form fields
+  if (additionalData) {
+    Object.entries(additionalData).forEach(([key, value]) => {
+      formData.append(key, value);
+    });
+  }
+
+  const response = await fetch(url, {
+    method: 'POST',
+    credentials: 'include', // Important for session cookies
+    body: formData,
+    // Don't set Content-Type header - browser will set it with boundary
+  });
+
+  const text = await response.text();
+
+  if (!response.ok) {
+    try {
+      const parsed = text ? JSON.parse(text) : {};
+      throw new Error(parsed.message || 'Upload failed');
+    } catch (e: any) {
+      throw new Error((e && e.message) || 'Upload failed');
+    }
+  }
+
+  if (!text) return { success: true };
+
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    return { success: true };
+  }
+}
+

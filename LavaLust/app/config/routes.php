@@ -80,8 +80,13 @@ $router->get('/api/students/last-id', 'StudentController::api_get_last_id');
 $router->get('/api/students/by-user/{user_id}', 'StudentController::api_get_by_user_id')->where_number('user_id');
 $router->get('/api/students/{id}', 'StudentController::api_get_student')->where_number('id');
 $router->post('/api/students', 'StudentController::api_create_student');
+$router->get('/api/students/export', 'StudentController::api_export_students');
+$router->post('/api/students/import', 'StudentController::api_import_students');
 $router->put('/api/students/{id}', 'StudentController::api_update_student')->where_number('id');
 $router->delete('/api/students/{id}', 'StudentController::api_delete_student')->where_number('id');
+
+// Tools / Utilities
+$router->get('/tools/generate-students', 'Tools::generate_students');
 
 // API Routes - Sections (Admin only)
 $router->get('/api/sections', 'SectionController::api_get_sections');
@@ -109,4 +114,26 @@ $router->delete('/api/subjects/{id}', 'SubjectController::api_delete_subject')->
 
 // API Routes - Teacher Assignments (Admin only)
 $router->post('/api/teacher-assignments', 'TeacherAssignmentController::api_assign_subjects');
+$router->get('/api/teacher-assignments/my', 'TeacherAssignmentController::api_get_mine');
 $router->get('/api/teacher-assignments/by-teacher/{teacher_id}', 'TeacherAssignmentController::api_get_by_teacher')->where_number('teacher_id');
+$router->get('/api/teacher-assignments', 'TeacherAssignmentController::api_get_all');
+// Remove a single teacher_subject -> section mapping
+$router->post('/api/teacher-assignments/remove-section', 'TeacherAssignmentController::api_remove_section');
+// Remove an entire teacher_subject assignment
+$router->post('/api/teacher-assignments/remove-assignment', 'TeacherAssignmentController::api_remove_assignment');
+
+// API Routes - Student Subjects (Enrollments)
+$router->get('/api/student-subjects', 'StudentSubjectController::api_get');
+$router->post('/api/student-subjects', 'StudentSubjectController::api_create');
+$router->post('/api/student-subjects/delete', 'StudentSubjectController::api_delete');
+
+// API Routes - Activities (Grade Transparency)
+$router->get('/api/activities', 'ActivityController::api_get_activities');
+$router->get('/api/activities/{id}', 'ActivityController::api_get_activity')->where_number('id');
+$router->post('/api/activities', 'ActivityController::api_create_activity');
+$router->put('/api/activities/{id}', 'ActivityController::api_update_activity')->where_number('id');
+$router->delete('/api/activities/{id}', 'ActivityController::api_delete_activity')->where_number('id');
+$router->get('/api/activities/{id}/grades', 'ActivityController::api_get_activity_grades')->where_number('id');
+$router->post('/api/activities/{id}/grades', 'ActivityController::api_set_grade')->where_number('id');
+// Bulk upsert grades for an activity (teacher/admin only)
+$router->post('/api/activities/{id}/grades/bulk', 'ActivityController::api_set_grades_bulk')->where_number('id');
