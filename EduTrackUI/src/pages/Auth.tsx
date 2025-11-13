@@ -23,7 +23,6 @@ const Auth = () => {
   const [registerEmail, setRegisterEmail] = useState("");
   const [registerPassword, setRegisterPassword] = useState("");
   const [registerConfirmPassword, setRegisterConfirmPassword] = useState("");
-  const [registerRole, setRegisterRole] = useState("student");
   
   const { login, register, user } = useAuth();
   const navigate = useNavigate();
@@ -71,30 +70,45 @@ const Auth = () => {
       return;
     }
     
+    // Restrict signup to allowed email domains
+    const allowedDomains = ['@gmail.com', '@mcc.edu.ph'];
+    const emailToCheck = registerEmail.trim().toLowerCase();
+    const domainAllowed = allowedDomains.some((d) => emailToCheck.endsWith(d));
+    if (!domainAllowed) {
+      toast.error('Registration allowed only with @gmail.com or @mcc.edu.ph addresses');
+      return;
+    }
+
     setIsLoading(true);
-    
+
     const result = await register(
       registerEmail,
       registerPassword,
       registerFirstName,
       registerLastName,
-      registerRole
+      "student"
     );
-    
-    if (result.success) {
+
+    if (result && result.success) {
       toast.success(result.message || "Registration successful! Please login.");
+      // If email was sent successfully, show a specific toast
+      if (result.email_result && result.email_result.success) {
+        toast.success("Welcome email sent to " + registerEmail);
+      } else if (result.email_result && !result.email_result.success) {
+        // non-blocking info if email failed
+        toast("Registration complete, but welcome email could not be sent.");
+      }
       // Reset form
       setRegisterFirstName("");
       setRegisterLastName("");
       setRegisterEmail("");
       setRegisterPassword("");
       setRegisterConfirmPassword("");
-      setRegisterRole("student");
       // Switch to login tab
       const loginTab = document.querySelector('[value="signin"]') as HTMLButtonElement;
       loginTab?.click();
     } else {
-      toast.error(result.message || "Registration failed");
+      toast.error(result?.message || "Registration failed");
     }
     
     setIsLoading(false);
@@ -135,7 +149,12 @@ const Auth = () => {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="signin-password">Password</Label>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="signin-password">Password</Label>
+                      <Link to="/auth/forgot-password" className="text-sm text-primary hover:underline">
+                        Forgot password?
+                      </Link>
+                    </div>
                     <Input 
                       id="signin-password" 
                       type="password"
@@ -193,21 +212,6 @@ const Auth = () => {
                       onChange={(e) => setRegisterEmail(e.target.value)}
                       required 
                     />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-role">Role</Label>
-                    <select 
-                      id="signup-role"
-                      title="Select your role"
-                      className="w-full px-3 py-2 border rounded-md"
-                      value={registerRole}
-                      onChange={(e) => setRegisterRole(e.target.value)}
-                      required
-                    >
-                      <option value="student">Student</option>
-                      <option value="teacher">Teacher</option>
-                      <option value="admin">Admin</option>
-                    </select>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="signup-password">Password</Label>

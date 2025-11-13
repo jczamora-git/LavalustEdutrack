@@ -49,6 +49,8 @@ $router->get('/', 'Welcome::index');
 $router->match('/auth/login', 'UserController::login', ['GET', 'POST']);
 $router->match('/auth/register', 'UserController::register', ['GET', 'POST']);
 $router->get('/auth/logout', 'UserController::logout');
+// Password reset web page (simple server-side form)
+$router->match('/auth/reset', 'UserController::reset', ['GET', 'POST']);
 
 // API Routes - Authentication
 $router->post('/api/auth/register', 'UserController::api_register');
@@ -56,6 +58,12 @@ $router->post('/api/auth/login', 'UserController::api_login');
 $router->post('/api/auth/logout', 'UserController::api_logout');
 $router->get('/api/auth/me', 'UserController::me');
 $router->get('/api/auth/check', 'UserController::check');
+// Password reset request (sends reset email)
+$router->post('/api/auth/request-reset', 'UserController::api_request_password_reset');
+// API endpoint to accept token and new password
+$router->post('/api/auth/reset-password', 'UserController::api_reset_password');
+// API endpoint to send welcome email when a user is created by admin
+$router->post('/api/auth/send-welcome-email', 'UserController::api_send_welcome_email');
 
 // API Routes - User Management (Admin only)
 $router->get('/api/users', 'UserController::api_get_users');
@@ -84,6 +92,8 @@ $router->get('/api/students/export', 'StudentController::api_export_students');
 $router->post('/api/students/import', 'StudentController::api_import_students');
 $router->put('/api/students/{id}', 'StudentController::api_update_student')->where_number('id');
 $router->delete('/api/students/{id}', 'StudentController::api_delete_student')->where_number('id');
+// API endpoint to send welcome email to a newly created student
+$router->post('/api/students/send-welcome-email', 'StudentController::api_send_welcome_email');
 
 // Tools / Utilities
 $router->get('/tools/generate-students', 'Tools::generate_students');
@@ -135,5 +145,3 @@ $router->put('/api/activities/{id}', 'ActivityController::api_update_activity')-
 $router->delete('/api/activities/{id}', 'ActivityController::api_delete_activity')->where_number('id');
 $router->get('/api/activities/{id}/grades', 'ActivityController::api_get_activity_grades')->where_number('id');
 $router->post('/api/activities/{id}/grades', 'ActivityController::api_set_grade')->where_number('id');
-// Bulk upsert grades for an activity (teacher/admin only)
-$router->post('/api/activities/{id}/grades/bulk', 'ActivityController::api_set_grades_bulk')->where_number('id');

@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus, Search, Edit, Trash2, User, BookOpen, LayoutGrid, List, Upload, DownloadCloud } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertMessage } from "@/components/AlertMessage";
+import EmailLoadingModal from "@/components/EmailLoadingModal";
 import { useConfirm } from "@/components/Confirm";
 import { API_ENDPOINTS, apiPost, apiGet, apiPut, apiDelete, apiUploadFile } from "@/lib/api";
 import { Pagination } from "@/components/Pagination";
@@ -71,6 +72,8 @@ const Students = () => {
 
   const [isImportResultOpen, setIsImportResultOpen] = useState(false);
   const [importResult, setImportResult] = useState<{ inserted: number; skipped: number; total_rows: number; errors: string[] } | null>(null);
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [emailSuccess, setEmailSuccess] = useState(false);
 
   const showAlert = (type: "success" | "error" | "info", message: string) => {
     setAlert({ type, message });
@@ -416,6 +419,8 @@ const Students = () => {
     }
     // We'll create a user first, then create the student profile linked to that user.
     let createdUserId: number | string | null = null;
+    setEmailSuccess(false);
+    setShowEmailModal(true);
     try {
       // 1) create user
       const userResp = await apiPost(API_ENDPOINTS.USERS, {
@@ -430,10 +435,12 @@ const Students = () => {
       if (!userResp || !userResp.success || !userResp.user) {
         const msg = (userResp && userResp.message) || 'Failed to create user';
         showAlert('error', msg);
+        setShowEmailModal(false);
         return;
       }
 
       createdUserId = userResp.user.id;
+      const defaultPassword = userResp.default_password || 'demo123';
 
       // 2) create student profile
       const studentIdToUse = form.studentId?.trim() || await generateStudentId();
@@ -458,7 +465,39 @@ const Students = () => {
         }
         const msg = (res && res.message) || 'Failed to create student profile';
         showAlert('error', msg);
+        setShowEmailModal(false);
         return;
+      }
+
+      // 3) Send welcome email
+      const emailResponse = await fetch('/api/students/send-welcome-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: form.email.trim(),
+          firstName: form.firstName.trim(),
+          lastName: form.lastName.trim(),
+          password: defaultPassword,
+          studentId: studentIdToUse,
+          yearLevel: yearLevelToEnum(form.yearLevel) || `${form.yearLevel}st Year`
+        }),
+        credentials: 'include'
+      });
+
+      // read text first in case server returns HTML (login page, error, etc.)
+      const emailText = await emailResponse.text();
+      let emailData: any = null;
+      try {
+        emailData = emailText ? JSON.parse(emailText) : { success: emailResponse.ok };
+      } catch (err) {
+        console.error('Non-JSON response from email endpoint:', emailResponse.status, emailText);
+        emailData = { success: emailResponse.ok, message: emailText };
+      }
+
+      if (emailData && emailData.success) {
+        setEmailSuccess(true);
+      } else {
+        setEmailSuccess(false);
       }
 
       // success: use returned student if present
@@ -478,8 +517,15 @@ const Students = () => {
           assignedCourses: created.assigned_courses ?? (form.assignedCourses || []),
         };
         setStudents((s) => [newStudent, ...s]);
-        setIsCreateOpen(false);
-        showAlert('success', `Student ${newStudent.name} created${userResp.default_password ? ` — default password: ${userResp.default_password}` : ''}`);
+        
+        // Auto close modal and cleanup after 3 seconds
+        setTimeout(() => {
+          setShowEmailModal(false);
+          setIsCreateOpen(false);
+          setForm({ firstName: "", lastName: "", email: "", studentId: "", yearLevel: "1", section: "", phone: "", parentContact: undefined, status: "active", assignedCourses: [] });
+        }, 3000);
+        
+        showAlert('success', `Student ${newStudent.name} created. Welcome email ${emailData.success ? 'sent' : 'send attempted'}!`);
         return;
       }
 
@@ -487,8 +533,14 @@ const Students = () => {
       const displayName = `${form.firstName.trim()} ${form.lastName.trim()}`;
       const newStudent: Student = { id: String(createdUserId ?? Date.now()), name: displayName, email: form.email, studentId: studentIdToUse, yearLevel: form.yearLevel, section: '', phone: form.phone, parentContact: form.parentContact, status: form.status, assignedCourses: form.assignedCourses };
       setStudents((s) => [newStudent, ...s]);
-      setIsCreateOpen(false);
-      showAlert('success', `Student ${displayName} created (local)`);
+      
+      setTimeout(() => {
+        setShowEmailModal(false);
+        setIsCreateOpen(false);
+        setForm({ firstName: "", lastName: "", email: "", studentId: "", yearLevel: "1", section: "", phone: "", parentContact: undefined, status: "active", assignedCourses: [] });
+      }, 3000);
+      
+      showAlert('success', `Student ${displayName} created. Welcome email ${emailData.success ? 'sent' : 'send attempted'}!`);
     } catch (err: any) {
       console.error('Error creating student:', err);
       // cleanup if user was created
@@ -499,6 +551,7 @@ const Students = () => {
           console.warn('Cleanup failed', cleanupErr);
         }
       }
+      setShowEmailModal(false);
       showAlert('error', err.message || 'Failed to create student');
     }
   };
@@ -592,6 +645,17 @@ const Students = () => {
 
   return (
     <DashboardLayout>
+      {/* Email Loading Modal */}
+      <EmailLoadingModal
+        isOpen={showEmailModal}
+        isSuccess={emailSuccess}
+        emailType="confirmation"
+        customMessage="Sending welcome email..."
+        customSuccessMessage="Welcome email sent successfully!"
+        onComplete={() => setShowEmailModal(false)}
+        autoCloseDuration={3000}
+      />
+
       <div className="p-8">
           <div className="mb-6 flex items-center justify-between">
           <div>

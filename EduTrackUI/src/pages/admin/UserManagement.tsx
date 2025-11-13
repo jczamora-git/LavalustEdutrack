@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus, Search, Edit, Trash2, Users, Grid3x3, List, Loader2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertMessage } from "@/components/AlertMessage";
+import EmailLoadingModal from "@/components/EmailLoadingModal";
 import { useConfirm } from "@/components/Confirm";
 import { API_ENDPOINTS, apiGet, apiPost, apiPut, apiDelete } from "@/lib/api";
 import { Pagination } from "@/components/Pagination";
@@ -65,6 +66,8 @@ const UserManagement = () => {
   const [alert, setAlert] = useState<{ type: "success" | "error" | "info"; message: string } | null>(null);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const itemsPerPage = 10;
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [emailSuccess, setEmailSuccess] = useState(false);
 
   const showAlert = (type: "success" | "error" | "info", message: string) => {
     setAlert({ type, message });
@@ -142,6 +145,8 @@ const UserManagement = () => {
     }
 
     setIsLoading(true);
+    setEmailSuccess(false);
+    setShowEmailModal(true);
     try {
       // Step 1: Create the user
       const response = await apiPost(API_ENDPOINTS.USERS, {
@@ -156,29 +161,74 @@ const UserManagement = () => {
       if (!response.success || !response.user) {
         toast.error("Failed to create user");
         setIsLoading(false);
+        setShowEmailModal(false);
         return;
       }
 
       const userId = response.user.id;
+      const defaultPassword = response.default_password || 'demo123';
       console.log("User created with ID:", userId, "Role:", form.role);
 
       // Step 2: Create profile based on role
       if (form.role === 'teacher') {
         await createTeacherProfile(userId);
-        toast.success(`Teacher created! Default password: ${response.default_password || 'demo123'} | Profile created with auto-generated Employee ID`);
       } else if (form.role === 'student') {
         await createStudentProfile(userId);
-        toast.success(`Student created! Default password: ${response.default_password || 'demo123'} | Profile created with auto-generated Student ID`);
-      } else {
-        toast.success(`Admin created! Default password: ${response.default_password || 'demo123'}`);
       }
 
-      // Step 3: Reset form and refresh
-  setIsCreateOpen(false);
-  setForm({ firstName: "", lastName: "", email: "", role: "student", status: "active", phone: "", yearLevel: "1st Year" });
-      fetchUsers(); // Refresh the list
+      // Step 3: Send welcome email
+      const emailEndpoint = form.role === 'student' 
+        ? '/api/students/send-welcome-email'
+        : '/api/auth/send-welcome-email';
+      
+      const emailResponse = await fetch(emailEndpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: form.email.trim(),
+          firstName: form.firstName.trim(),
+          lastName: form.lastName.trim(),
+          password: defaultPassword,
+          role: form.role
+        }),
+        credentials: 'include'
+      });
+
+      // Read as text first in case the server returns HTML (e.g. login page or error page)
+      const emailText = await emailResponse.text();
+      let emailData: any = null;
+      try {
+        emailData = emailText ? JSON.parse(emailText) : { success: emailResponse.ok };
+      } catch (err) {
+        console.error('Non-JSON response from email endpoint:', emailResponse.status, emailText);
+        emailData = { success: emailResponse.ok, message: emailText };
+      }
+
+      if (emailData && emailData.success) {
+        setEmailSuccess(true);
+        toast.success(`${form.role === 'teacher' ? 'Teacher' : form.role === 'student' ? 'Student' : 'Admin'} created! Welcome email sent.`);
+
+        // Auto close modal and refresh after 3 seconds
+        setTimeout(() => {
+          setShowEmailModal(false);
+          setIsCreateOpen(false);
+          setForm({ firstName: "", lastName: "", email: "", role: "student", status: "active", phone: "", yearLevel: "1st Year" });
+          fetchUsers();
+        }, 3000);
+      } else {
+        setEmailSuccess(false);
+        toast.warning(`${form.role === 'teacher' ? 'Teacher' : form.role === 'student' ? 'Student' : 'Admin'} created but welcome email failed to send.`);
+        // optionally log server's raw response to help debugging
+        if (emailData && emailData.message) console.debug('Email endpoint message:', emailData.message);
+        setShowEmailModal(false);
+        setIsCreateOpen(false);
+        setForm({ firstName: "", lastName: "", email: "", role: "student", status: "active", phone: "", yearLevel: "1st Year" });
+        fetchUsers();
+      }
     } catch (error: any) {
       console.error("Create error:", error);
+      setEmailSuccess(false);
+      setShowEmailModal(false);
       toast.error(error.message || "Failed to create user");
     } finally {
       setIsLoading(false);
@@ -406,6 +456,17 @@ const UserManagement = () => {
 
   return (
     <DashboardLayout>
+      {/* Email Loading Modal */}
+      <EmailLoadingModal
+        isOpen={showEmailModal}
+        isSuccess={emailSuccess}
+        emailType="confirmation"
+        customMessage="Sending welcome email..."
+        customSuccessMessage="Welcome email sent successfully!"
+        onComplete={() => setShowEmailModal(false)}
+        autoCloseDuration={3000}
+      />
+
       <div className="p-8">
         <div className="mb-8 flex items-center justify-between">
           <div>

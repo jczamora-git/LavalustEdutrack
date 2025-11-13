@@ -819,4 +819,86 @@ class StudentController extends Controller
             ]);
         }
     }
+
+    /**
+     * Send welcome email to newly created student
+     * POST /api/students/send-welcome-email
+     */
+    public function api_send_welcome_email()
+    {
+        api_set_json_headers();
+
+        // Check if user is admin
+        if (!$this->session->userdata('logged_in') || $this->session->userdata('role') !== 'admin') {
+            http_response_code(403);
+            echo json_encode([
+                'success' => false,
+                'message' => 'Access denied. Admin only.'
+            ]);
+            return;
+        }
+
+        try {
+            // Get raw POST data and decode JSON
+            $raw_input = file_get_contents('php://input');
+            $json_data = json_decode($raw_input, true);
+
+            // Extract data
+            $email = $json_data['email'] ?? '';
+            $firstName = $json_data['firstName'] ?? '';
+            $lastName = $json_data['lastName'] ?? '';
+            $password = $json_data['password'] ?? '';
+            $studentId = $json_data['studentId'] ?? '';
+            $yearLevel = $json_data['yearLevel'] ?? '';
+
+            // Validate required fields
+            if (empty($email) || empty($firstName) || empty($lastName) || empty($password)) {
+                http_response_code(400);
+                echo json_encode([
+                    'success' => false,
+                    'message' => 'Email, name, password are required'
+                ]);
+                return;
+            }
+
+            // Load mail helpers
+            $this->call->helper('mail_helper');
+            $this->call->helper('email_templates_helper');
+
+            // Generate welcome email using template
+            $portalUrl = 'http://localhost:5174/auth';
+            $emailBody = generate_student_welcome_email_with_credentials(
+                $firstName,
+                $email,
+                $password,
+                $studentId,
+                $yearLevel,
+                $portalUrl
+            );
+
+            // Send email
+            $result = sendNotif($email, 'Your EduTrack Student Account Has Been Created', $emailBody);
+
+            if ($result['success']) {
+                http_response_code(200);
+                echo json_encode([
+                    'success' => true,
+                    'message' => 'Welcome email sent successfully'
+                ]);
+            } else {
+                http_response_code(500);
+                echo json_encode([
+                    'success' => false,
+                    'message' => $result['message'] ?? 'Failed to send welcome email'
+                ]);
+            }
+        } catch (Exception $e) {
+            error_log('Exception in api_send_welcome_email: ' . $e->getMessage());
+            http_response_code(500);
+            echo json_encode([
+                'success' => false,
+                'message' => 'Server error: ' . $e->getMessage()
+            ]);
+        }
+    }
 }

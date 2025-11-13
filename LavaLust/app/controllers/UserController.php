@@ -207,6 +207,49 @@ class UserController extends Controller
             $userId = $this->UserModel->create($userData);
             
             if ($userId) {
+                // If role is student, create student profile with auto-generated ID
+                if ($role === 'student') {
+                    $this->call->model('StudentModel');
+                    
+                    // Generate student ID using current year
+                    $currentYear = date('Y');
+                    $studentId = $this->StudentModel->generate_student_id($currentYear);
+                    
+                    // Create student record
+                    $studentData = [
+                        'user_id' => $userId,
+                        'student_id' => $studentId,
+                        'year_level' => 1, // Default to first year
+                        'section_id' => null,
+                        'status' => 'active',
+                        'created_at' => date('Y-m-d H:i:s'),
+                        'updated_at' => date('Y-m-d H:i:s')
+                    ];
+                    
+                    $studentCreated = $this->db->table('students')->insert($studentData);
+                    
+                    if (!$studentCreated) {
+                        // Log the error but don't fail the registration
+                        error_log('Failed to create student profile for user ID: ' . $userId);
+                    }
+                }
+                
+                // Send welcome email
+                $this->call->helper('mail');
+                $this->call->helper('email_templates');
+                
+                $welcomeSubject = 'Welcome to Mindoro State University Portal - EduTrack PH';
+                $portalUrl = 'http://localhost:5174/auth';
+                $logoUrl = 'http://localhost:5174/logo.png';
+                $welcomeBody = generate_welcome_email($first_name, $email, $role, $portalUrl, $logoUrl);
+                
+                $emailResult = sendNotif($email, $welcomeSubject, $welcomeBody);
+                
+                if (!$emailResult['success']) {
+                    // Log email failure but don't fail the registration
+                    error_log('Failed to send welcome email to: ' . $email . ' - ' . $emailResult['message']);
+                }
+                
                 // Get user data (without password)
                 $user = $this->UserModel->find_by_id($userId);
                 unset($user['password']);
@@ -215,7 +258,8 @@ class UserController extends Controller
                 echo json_encode([
                     'success' => true,
                     'message' => 'User registered successfully',
-                    'user' => $user
+                    'user' => $user,
+                    'email_result' => $emailResult // include email send result for frontend
                 ]);
             } else {
                 http_response_code(500);
@@ -786,6 +830,290 @@ class UserController extends Controller
             }
             
         } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode([
+                'success' => false,
+                'message' => 'Server error: ' . $e->getMessage()
+            ]);
+        }
+    }
+
+    /**
+     * Request a password reset link to be sent to the user's email
+     * POST /api/auth/request-reset
+     */
+    public function api_request_password_reset()
+    {
+        api_set_json_headers();
+
+        try {
+            $raw_input = file_get_contents('php://input');
+            $json_data = json_decode($raw_input, true);
+            $email = trim($json_data['email'] ?? '');
+
+            if (empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                http_response_code(400);
+                echo json_encode([
+                    'success' => false,
+                    'message' => 'Please provide a valid email address.'
+                ]);
+                return;
+            }
+
+            // Always respond with success message to avoid email enumeration
+            $genericResponse = [
+                'success' => true,
+                'message' => 'If that email exists in our system, a password reset link has been sent.'
+            ];
+
+            // Find user by email
+            $user = $this->UserModel->find_by_email($email);
+            if (!$user) {
+                echo json_encode($genericResponse);
+                return;
+            }
+
+            // Generate secure token and expiry (24 hours)
+            $token = bin2hex(random_bytes(16));
+            $expiresAt = date('Y-m-d H:i:s', time() + 86400);
+
+            // Store token in password_resets table
+            try {
+                $this->db->table('password_resets')->insert([
+                    'email' => $email,
+                    'token' => $token,
+                    'expires_at' => $expiresAt,
+                    'used' => 0,
+                    'created_at' => date('Y-m-d H:i:s'),
+                    'updated_at' => date('Y-m-d H:i:s')
+                ]);
+            } catch (Exception $e) {
+                // Log and continue — insertion failure shouldn't stop email send attempt
+                error_log('Failed to insert password reset token: ' . $e->getMessage());
+            }
+
+            // Prepare email
+            $this->call->helper('mail');
+            $this->call->helper('email_templates');
+
+            $resetUrl = sprintf('http://localhost:5174/auth/reset?token=%s', $token);
+            $logoUrl = 'http://localhost:5174/logo.png';
+            $subject = 'EduTrack Password Reset Request';
+            $body = generate_password_reset_email($user['first_name'] ?? $user['email'], $resetUrl, $logoUrl);
+
+            $emailResult = sendNotif($email, $subject, $body);
+
+            if (!$emailResult['success']) {
+                // Log but don't reveal details to client
+                error_log('Password reset email failed: ' . $emailResult['message']);
+            }
+
+            echo json_encode($genericResponse);
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode([
+                'success' => false,
+                'message' => 'Server error: ' . $e->getMessage()
+            ]);
+        }
+    }
+
+    /**
+     * Render a simple password reset page (GET) or handle form POST
+     * URL: /auth/reset?token=...
+     */
+    public function reset()
+    {
+        // If POST, process the form submission server-side (non-API)
+        if ($this->io->method() === 'post') {
+            $token = $this->io->post('token');
+            $newPassword = $this->io->post('password');
+
+            // Simple validation
+            if (empty($token) || empty($newPassword) || strlen($newPassword) < 6) {
+                $this->session->set_flashdata('error', 'Invalid token or password. Password must be at least 6 characters.');
+                redirect('auth/reset?token=' . urlencode($token));
+                return;
+            }
+
+            // Delegate to API handler logic by calling api_reset_password via internal call
+            $_POST = ['token' => $token, 'password' => $newPassword];
+            $this->api_reset_password();
+            return;
+        }
+
+        // For GET, display the form view and pass token
+        $token = $this->io->get('token');
+        $data = ['token' => $token, 'error' => $this->session->flashdata('error'), 'success' => $this->session->flashdata('success')];
+        $this->call->view('auth/reset_password', $data);
+    }
+
+    /**
+     * API: reset password using token
+     * POST /api/auth/reset-password
+     * Body JSON: { token, password }
+     */
+    public function api_reset_password()
+    {
+        api_set_json_headers();
+
+        try {
+            // Read raw input once and decode
+            $raw_input = file_get_contents('php://input');
+            error_log('Reset password raw input: ' . $raw_input);
+            
+            $json_data = json_decode($raw_input, true);
+            error_log('Decoded JSON data: ' . json_encode($json_data));
+
+            // Extract token and password from JSON (prefer JSON over POST for API calls)
+            $token = isset($json_data['token']) ? trim($json_data['token']) : '';
+            $newPassword = isset($json_data['password']) ? $json_data['password'] : '';
+
+            error_log('Token: ' . $token . ', Password length: ' . strlen($newPassword));
+
+            if (empty($token) || empty($newPassword) || strlen($newPassword) < 6) {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'message' => 'Invalid token or password (min 6 chars).']);
+                return;
+            }
+
+            // Find token record
+            error_log('Looking for token in password_resets table: ' . $token);
+            $reset = $this->db->table('password_resets')->where('token', $token)->get();
+            
+            if (!$reset) {
+                error_log('Token not found in database');
+                http_response_code(400);
+                echo json_encode(['success' => false, 'message' => 'Invalid or expired token.']);
+                return;
+            }
+
+            error_log('Token found: ' . json_encode($reset));
+
+            // Check expiry and usage
+            if ((int)$reset['used'] === 1) {
+                error_log('Token already used');
+                http_response_code(400);
+                echo json_encode(['success' => false, 'message' => 'Token has already been used.']);
+                return;
+            }
+
+            $expiresAt = strtotime($reset['expires_at']);
+            if ($expiresAt === false || $expiresAt < time()) {
+                error_log('Token expired. Expires at: ' . $reset['expires_at'] . ', Current time: ' . date('Y-m-d H:i:s'));
+                http_response_code(400);
+                echo json_encode(['success' => false, 'message' => 'Token has expired.']);
+                return;
+            }
+
+            $email = $reset['email'];
+            error_log('Finding user by email: ' . $email);
+            $user = $this->UserModel->find_by_email($email);
+            
+            if (!$user) {
+                error_log('User not found with email: ' . $email);
+                http_response_code(404);
+                echo json_encode(['success' => false, 'message' => 'User not found.']);
+                return;
+            }
+
+            error_log('User found: ' . $user['id']);
+
+            // Update password (update_user will hash it)
+            error_log('Updating password for user ID: ' . $user['id']);
+            
+            $updated = $this->UserModel->update_user($user['id'], ['password' => $newPassword]);
+
+            if (!$updated) {
+                error_log('Failed to update password for user ID: ' . $user['id']);
+                http_response_code(500);
+                echo json_encode(['success' => false, 'message' => 'Failed to update password.']);
+                return;
+            }
+
+            error_log('Password updated successfully for user ID: ' . $user['id']);
+
+            // Mark token as used
+            $tokenUpdate = $this->db->table('password_resets')->where('id', $reset['id'])->update([
+                'used' => 1,
+                'updated_at' => date('Y-m-d H:i:s')
+            ]);
+            error_log('Token marked as used: ' . ($tokenUpdate ? 'success' : 'failed'));
+
+            echo json_encode(['success' => true, 'message' => 'Password updated successfully.']);
+        } catch (Exception $e) {
+            error_log('Exception in api_reset_password: ' . $e->getMessage() . ' | ' . $e->getTraceAsString());
+            http_response_code(500);
+            echo json_encode(['success' => false, 'message' => 'Server error: ' . $e->getMessage()]);
+        }
+    }
+
+    /**
+     * Send welcome email to newly created user
+     * POST /api/auth/send-welcome-email
+     */
+    public function api_send_welcome_email()
+    {
+        api_set_json_headers();
+
+        // Check if user is admin
+        if (!$this->session->userdata('logged_in') || $this->session->userdata('role') !== 'admin') {
+            http_response_code(403);
+            echo json_encode([
+                'success' => false,
+                'message' => 'Access denied. Admin only.'
+            ]);
+            return;
+        }
+
+        try {
+            // Get raw POST data and decode JSON
+            $raw_input = file_get_contents('php://input');
+            $json_data = json_decode($raw_input, true);
+
+            // Extract data
+            $email = $json_data['email'] ?? '';
+            $firstName = $json_data['firstName'] ?? '';
+            $lastName = $json_data['lastName'] ?? '';
+            $password = $json_data['password'] ?? '';
+            $role = $json_data['role'] ?? 'student';
+
+            // Validate required fields
+            if (empty($email) || empty($firstName) || empty($lastName) || empty($password)) {
+                http_response_code(400);
+                echo json_encode([
+                    'success' => false,
+                    'message' => 'Email, name, password, and role are required'
+                ]);
+                return;
+            }
+
+            // Load mail helpers
+            $this->call->helper('mail_helper');
+            $this->call->helper('email_templates_helper');
+
+            // Generate welcome email using template
+            $portalUrl = 'http://localhost:5174/auth';
+            $emailBody = generate_welcome_email_with_credentials($firstName, $email, $role, $password, $portalUrl);
+
+            // Send email
+            $result = sendNotif($email, 'Your EduTrack Account Has Been Created', $emailBody);
+
+            if ($result['success']) {
+                http_response_code(200);
+                echo json_encode([
+                    'success' => true,
+                    'message' => 'Welcome email sent successfully'
+                ]);
+            } else {
+                http_response_code(500);
+                echo json_encode([
+                    'success' => false,
+                    'message' => $result['message'] ?? 'Failed to send welcome email'
+                ]);
+            }
+        } catch (Exception $e) {
+            error_log('Exception in api_send_welcome_email: ' . $e->getMessage());
             http_response_code(500);
             echo json_encode([
                 'success' => false,

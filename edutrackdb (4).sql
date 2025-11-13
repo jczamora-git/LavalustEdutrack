@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: localhost:3306
--- Generation Time: Nov 11, 2025 at 10:52 AM
+-- Generation Time: Nov 13, 2025 at 07:20 PM
 -- Server version: 8.4.3
 -- PHP Version: 8.3.26
 
@@ -102,6 +102,47 @@ INSERT INTO `activity_grades` (`id`, `activity_id`, `student_id`, `grade`, `stat
 (23, 6, 324, 78.00, 'Pending', '2025-11-11 02:04:24', '2025-11-11 02:34:25'),
 (24, 6, 326, 44.00, 'Pending', '2025-11-11 02:04:24', '2025-11-11 02:34:23'),
 (25, 6, 240, 90.00, 'Pending', '2025-11-11 02:17:29', '2025-11-11 02:34:20');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `password_resets`
+--
+
+CREATE TABLE `password_resets` (
+  `id` int UNSIGNED NOT NULL,
+  `email` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `token` varchar(128) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `expires_at` datetime NOT NULL,
+  `used` tinyint(1) NOT NULL DEFAULT '0',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `password_resets`
+--
+
+INSERT INTO `password_resets` (`id`, `email`, `token`, `expires_at`, `used`, `created_at`, `updated_at`) VALUES
+(1, 'jeizi.zamora@gmail.com', '49914175d667023585b982fdeb68cdf8', '2025-11-14 18:46:31', 0, '2025-11-13 18:46:31', '2025-11-13 18:46:31'),
+(2, 'jeizi.zamora@gmail.com', 'aa611f39db859591b0190e20c3461ffb', '2025-11-14 18:51:12', 1, '2025-11-13 18:51:12', '2025-11-13 18:58:26'),
+(3, 'jeizi.zamora@gmail.com', '175d5c005fdeb6bd13f40b27763c1d6b', '2025-11-14 18:58:42', 1, '2025-11-13 18:58:42', '2025-11-13 18:59:14'),
+(4, 'jeizi.zamora@gmail.com', '5471a2746e57d88274012fe0391f9db1', '2025-11-14 19:00:32', 1, '2025-11-13 19:00:32', '2025-11-13 19:01:07'),
+(5, 'jeizi.zamora@gmail.com', '728b832af7a577b8fd6c2d93ef852edb', '2025-11-14 19:07:04', 1, '2025-11-13 19:07:04', '2025-11-13 19:07:45'),
+(6, 'jeizi.zamora@gmail.com', 'bad59a6be67d1b8ef8557342e0129e18', '2025-11-14 19:07:59', 1, '2025-11-13 19:07:59', '2025-11-13 19:08:51'),
+(7, 'jeizi.zamora@gmail.com', '3b75ca40f369c25574a0ea8254bc06fd', '2025-11-14 19:10:49', 0, '2025-11-13 19:10:49', '2025-11-13 19:10:49'),
+(8, 'jeizi.zamora@gmail.com', 'aea5455d7b4be67bb179b49fe699b3dc', '2025-11-14 19:16:28', 0, '2025-11-13 19:16:28', '2025-11-13 19:16:28'),
+(9, 'jeizi.zamora@gmail.com', '5f4cc59b179f502dcca24e5d7dcaba09', '2025-11-14 19:17:16', 0, '2025-11-13 19:17:16', '2025-11-13 19:17:16'),
+(10, 'jeizi.zamora@gmail.com', 'cb14f3504972d2500f67de7adac24378', '2025-11-14 19:27:30', 0, '2025-11-13 19:27:30', '2025-11-13 19:27:30'),
+(11, 'jeizi.zamora@gmail.com', '0a9c71c005b71aefceea79bdc87f1e1b', '2025-11-14 19:28:33', 0, '2025-11-13 19:28:33', '2025-11-13 19:28:33'),
+(12, 'jeizi.zamora@gmail.com', '9974828f35cb23d5edb69d159db4135c', '2025-11-14 19:30:02', 0, '2025-11-13 19:30:02', '2025-11-13 19:30:02'),
+(13, 'jeizi.zamora@gmail.com', '5d06890675c2d764ee675f6ba96cc073', '2025-11-14 19:30:18', 0, '2025-11-13 19:30:18', '2025-11-13 19:30:18'),
+(14, 'jeizi.zamora@gmail.com', 'bee2fe72269a4c10f472151f6b43db8d', '2025-11-14 19:30:28', 0, '2025-11-13 19:30:28', '2025-11-13 19:30:28'),
+(15, 'jeizi.zamora@gmail.com', 'f537340b629c285391b61cb142d7ca84', '2025-11-14 19:31:48', 0, '2025-11-13 19:31:48', '2025-11-13 19:31:48'),
+(16, 'jeizi.zamora@gmail.com', '0da38cec28f98b08ee0609aab5d523b2', '2025-11-14 19:32:06', 0, '2025-11-13 19:32:06', '2025-11-13 19:32:06'),
+(17, 'jeizi.zamora@gmail.com', 'ee6f2ac1b07ddbc7f9aa844f6840ca85', '2025-11-14 19:33:18', 0, '2025-11-13 19:33:18', '2025-11-13 19:33:18'),
+(18, 'iamchris.japan@gmail.com', 'c8e1114f849c840b567c20186147cc05', '2025-11-14 20:13:00', 0, '2025-11-13 20:13:00', '2025-11-13 20:13:00'),
+(19, 'iamchris.japan@gmail.com', '67c0d65cfa9c226f065bd2f71b91934c', '2025-11-14 20:13:45', 0, '2025-11-13 20:13:45', '2025-11-13 20:13:45');
 
 -- --------------------------------------------------------
 
@@ -511,7 +552,9 @@ INSERT INTO `students` (`id`, `user_id`, `student_id`, `year_level`, `section_id
 (361, 378, 'MCC2025-00360', '3rd Year', 1, 'active', '2025-11-10 12:30:54', '2025-11-10 12:46:40'),
 (362, 379, 'MCC2025-00361', '3rd Year', 1, 'active', '2025-11-10 12:30:54', '2025-11-10 12:46:41'),
 (363, 380, 'MCC2025-00362', '2nd Year', 1, 'active', '2025-11-10 12:30:54', '2025-11-10 12:31:44'),
-(364, 381, 'MCC2025-00363', '4th Year', NULL, 'active', '2025-11-10 12:30:54', '2025-11-10 19:30:54');
+(364, 381, 'MCC2025-00363', '4th Year', NULL, 'active', '2025-11-10 12:30:54', '2025-11-10 19:30:54'),
+(379, 398, 'MCC2025-00364', '1st Year', NULL, 'active', '2025-11-13 10:28:17', '2025-11-13 10:28:17'),
+(386, 405, 'MCC2025-00365', '2nd Year', NULL, 'active', '2025-11-13 12:16:01', '2025-11-13 19:16:01');
 
 -- --------------------------------------------------------
 
@@ -710,7 +753,7 @@ CREATE TABLE `users` (
 INSERT INTO `users` (`id`, `email`, `password`, `role`, `first_name`, `last_name`, `phone`, `status`, `created_at`, `updated_at`) VALUES
 (1, 'student@demo.com', '$2y$10$Ll4dzxFoqlaGCC1aL702BOdZ3xtLLijHcLKzW4SF1HPrlEgP9Frz6', 'student', 'Demo', 'Student', '', 'active', '2025-11-06 11:13:56', '2025-11-10 01:05:04'),
 (2, 'teacher@demo.com', '$2y$10$/zuE1Q4AmA1J6MXuovoRoenUL5PoblPSzSxXA3ubUw47wpiTNfoVS', 'teacher', 'Demo', 'Teacher', '', 'active', '2025-11-06 11:14:42', '2025-11-10 01:59:57'),
-(3, 'admin@demo.com', '$2y$10$zhZ636k.0buTfPYR..Q2eODPgdmjEcKklTOWC1HTR64BH13j0iNeS', 'admin', 'Demo', 'Admin', '', 'active', '2025-11-06 11:15:04', '2025-11-11 00:32:14'),
+(3, 'admin@demo.com', '$2y$10$zhZ636k.0buTfPYR..Q2eODPgdmjEcKklTOWC1HTR64BH13j0iNeS', 'admin', 'Demo', 'Admin', '', 'active', '2025-11-06 11:15:04', '2025-11-13 12:15:40'),
 (16, 'john.doe@example.com', '$2y$10$I19hzyUWwzkG9HMk8wEutekUr7tC9GmtiRFvW4lqePlq4eKBKXQtS', 'teacher', 'John', 'Doe', '', 'active', '2025-11-06 14:05:34', '2025-11-06 18:29:13'),
 (18, 'juan.delacruz@mcc.edu.ph', '$2y$10$762nxMWoGHGu7kRyvzc8K.FGrrYGGJpRdMbm5jentTkF4mfui3iBK', 'student', 'Juan', 'Dela Cruz', '', 'active', '2025-11-06 18:30:24', '2025-11-06 18:30:24'),
 (19, 'maria.santos@mcc.edu.ph', '$2y$10$KGlfA0PiOWB4HR0pds9.1epVHMzpgv3hsk.qLKXZCSh9mgaD20FCW', 'student', 'Maria', 'Santos', '', 'active', '2025-11-06 18:30:45', '2025-11-06 11:48:51'),
@@ -1075,7 +1118,9 @@ INSERT INTO `users` (`id`, `email`, `password`, `role`, `first_name`, `last_name
 (379, 'nina.tan@mcc.edu.ph', '$2y$10$PF7SvRWH5j0POPZ0a5U.5OZhNJtKJR2QfrQKCUgn9dBHN9t37aaRu', 'student', 'Nina', 'Tan', NULL, 'active', '2025-11-10 12:30:54', '2025-11-10 19:30:54'),
 (380, 'lily.quinto@mcc.edu.ph', '$2y$10$A3YCPmKUEkKwcoKrMLXj/u2Ne7VWte/IF4MIKUlhfFK3oX8FsDkA6', 'student', 'Lily', 'Quinto', NULL, 'active', '2025-11-10 12:30:54', '2025-11-10 19:30:54'),
 (381, 'sofia.garcia@mcc.edu.ph', '$2y$10$qUlzEY5fNgrOI616zmet0OnRnKJjb3NFjQuGfBnVby.jtOPwLTipG', 'student', 'Sofia', 'Garcia', NULL, 'active', '2025-11-10 12:30:54', '2025-11-10 19:30:54'),
-(382, 'quinn.garcia@mcc.edu.ph', '$2y$10$.enIC7rOQI7guq8c1o2br.hB9QpuKFylpDvpQF1eNvOzgQ9RknVJC', 'teacher', 'Garcia', 'Quinn', '', 'active', '2025-11-11 05:42:14', '2025-11-11 05:42:14');
+(382, 'quinn.garcia@mcc.edu.ph', '$2y$10$.enIC7rOQI7guq8c1o2br.hB9QpuKFylpDvpQF1eNvOzgQ9RknVJC', 'teacher', 'Garcia', 'Quinn', '', 'active', '2025-11-11 05:42:14', '2025-11-11 05:42:14'),
+(398, 'jeizi.zamora@gmail.com', '$2y$10$HFVy9f7i7ar5qM.VNvNgSOxYEST5JzbOJ6wdTW9nnIHpX1SACAB0q', 'student', 'JOHN', 'ZAMORA', '', 'active', '2025-11-13 17:28:17', '2025-11-13 12:12:49'),
+(405, 'iamchris.japan@gmail.com', '$2y$10$rVAv6OZyR5rs2wofK..GXOudFji4TpDuQ0ZoCjjWsvq89OVm3MaGm', 'student', 'JC', 'Zamora', '', 'active', '2025-11-13 19:16:01', '2025-11-13 19:16:01');
 
 -- --------------------------------------------------------
 
@@ -1163,6 +1208,14 @@ ALTER TABLE `activity_grades`
   ADD UNIQUE KEY `uq_activity_student` (`activity_id`,`student_id`),
   ADD KEY `idx_ag_activity` (`activity_id`),
   ADD KEY `idx_ag_student` (`student_id`);
+
+--
+-- Indexes for table `password_resets`
+--
+ALTER TABLE `password_resets`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `email` (`email`),
+  ADD KEY `token` (`token`);
 
 --
 -- Indexes for table `sections`
@@ -1271,6 +1324,12 @@ ALTER TABLE `activity_grades`
   MODIFY `id` bigint UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=26;
 
 --
+-- AUTO_INCREMENT for table `password_resets`
+--
+ALTER TABLE `password_resets`
+  MODIFY `id` int UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=20;
+
+--
 -- AUTO_INCREMENT for table `sections`
 --
 ALTER TABLE `sections`
@@ -1280,7 +1339,7 @@ ALTER TABLE `sections`
 -- AUTO_INCREMENT for table `students`
 --
 ALTER TABLE `students`
-  MODIFY `id` int UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=365;
+  MODIFY `id` int UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=387;
 
 --
 -- AUTO_INCREMENT for table `student_subjects`
@@ -1316,7 +1375,7 @@ ALTER TABLE `teacher_subject_sections`
 -- AUTO_INCREMENT for table `users`
 --
 ALTER TABLE `users`
-  MODIFY `id` int UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=383;
+  MODIFY `id` int UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=406;
 
 --
 -- AUTO_INCREMENT for table `year_levels`

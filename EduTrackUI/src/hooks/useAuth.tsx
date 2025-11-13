@@ -9,10 +9,21 @@ interface User {
   role: 'student' | 'teacher' | 'admin';
 }
 
+interface RegistrationResponse {
+  success: boolean;
+  message?: string;
+  // email_result comes from the backend and may include send status and message
+  email_result?: {
+    success: boolean;
+    message?: string;
+  };
+  user?: any;
+}
+
 interface AuthContextType {
   user: User | null;
   login: (email: string, password: string) => Promise<boolean>;
-  register: (email: string, password: string, firstName: string, lastName: string, role: string) => Promise<{ success: boolean; message?: string }>;
+  register: (email: string, password: string, firstName: string, lastName: string, role: string) => Promise<RegistrationResponse>;
   logout: () => Promise<void>;
   isAuthenticated: boolean;
   checkUser: () => Promise<boolean>;
@@ -76,7 +87,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     firstName: string, 
     lastName: string, 
     role: string
-  ): Promise<{ success: boolean; message?: string }> => {
+  ): Promise<RegistrationResponse> => {
     try {
       const response = await apiPost(API_ENDPOINTS.REGISTER, {
         email,
@@ -85,12 +96,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         last_name: lastName,
         role,
       });
-      
-      if (response.success) {
-        return { success: true, message: response.message };
-      }
-      
-      return { success: false, message: response.message || 'Registration failed' };
+
+      // Return the full response so callers can inspect email_result
+      return response;
     } catch (error: any) {
       console.error('Registration error:', error);
       return { success: false, message: error.message || 'Registration failed' };

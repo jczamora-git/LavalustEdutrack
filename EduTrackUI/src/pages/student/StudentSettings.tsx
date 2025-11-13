@@ -8,6 +8,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { User, Lock, Palette, AlertCircle, Eye, Bell, BookOpen } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertMessage } from "@/components/AlertMessage";
+import EmailLoadingModal from "@/components/EmailLoadingModal";
 
 interface CourseColor {
   courseId: string;
@@ -76,6 +77,9 @@ const StudentSettings = () => {
     message: string;
   } | null>(null);
 
+  // Email modal state
+  const [showEmailModal, setShowEmailModal] = useState(false);
+
   // Profile handlers
   const handleProfileChange = (field: string, value: string) => {
     setProfileData(prev => ({ ...prev, [field]: value }));
@@ -113,9 +117,33 @@ const StudentSettings = () => {
   };
 
   const handleForgotPassword = () => {
-    const emailToUse = user?.email || profileData.email || "your email";
-    setAlert({ type: "success", message: `Recovery link sent to ${emailToUse}. Check your inbox.` });
-    // TODO: integrate with backend password recovery endpoint
+    (async () => {
+      const emailToUse = user?.email || profileData.email;
+      if (!emailToUse) {
+        setAlert({ type: "error", message: "No email available for this account." });
+        return;
+      }
+
+      setShowEmailModal(true);
+      try {
+        const res = await fetch('/api/auth/request-reset', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: emailToUse })
+        });
+
+        const json = await res.json();
+        if (res.ok) {
+          setAlert({ type: 'success', message: json.message || `Recovery link sent to ${emailToUse}. Check your inbox.` });
+        } else {
+          setAlert({ type: 'error', message: json.message || 'Failed to request password reset.' });
+          setShowEmailModal(false);
+        }
+      } catch (err: any) {
+        setAlert({ type: 'error', message: 'Network error while requesting password reset.' });
+        setShowEmailModal(false);
+      }
+    })();
   };
 
   // Course color handlers
@@ -143,6 +171,15 @@ const StudentSettings = () => {
 
   return (
     <DashboardLayout>
+      {/* Email Loading Modal */}
+      <EmailLoadingModal
+        isOpen={showEmailModal}
+        isSuccess={alert?.type === 'success'}
+        emailType="reset"
+        onComplete={() => setShowEmailModal(false)}
+        autoCloseDuration={3000}
+      />
+
       {alert && (
         <AlertMessage
           type={alert.type}

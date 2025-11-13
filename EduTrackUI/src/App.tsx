@@ -9,13 +9,13 @@ import { ConfirmProvider } from "@/components/Confirm";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 import StudentDashboard from "./pages/StudentDashboard";
 import TeacherDashboard from "./pages/TeacherDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
 import NotFound from "./pages/NotFound";
 import Unauthorized from "./pages/Unauthorized";
-
-// Admin pages
 import UserManagement from "./pages/admin/UserManagement";
 import GradingSystem from "./pages/admin/GradingSystem";
 import SubjectAssignment from "./pages/admin/SubjectAssignment";
@@ -71,6 +71,8 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Auth />} />
             <Route path="/auth" element={<Auth />} />
+            <Route path="/auth/forgot-password" element={<ForgotPassword />} />
+            <Route path="/auth/reset" element={<ResetPassword />} />
             <Route path="/unauthorized" element={<Unauthorized />} />
             
             {/* Student Routes */}
