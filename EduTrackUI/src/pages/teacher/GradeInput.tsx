@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Award, Save, Upload, Download, FileSpreadsheet, Edit3 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { API_ENDPOINTS, apiGet } from "@/lib/api";
 
 const GradeInput = () => {
   const { user, isAuthenticated } = useAuth();
@@ -19,25 +20,101 @@ const GradeInput = () => {
     }
   }, [isAuthenticated, user, navigate]);
 
-  const [selectedCourse, setSelectedCourse] = useState("cs101");
-  const [selectedSection, setSelectedSection] = useState("12-polaris");
+  // selections / state (declared before effects)
+  const [selectedCourse, setSelectedCourse] = useState<string | null>(null);
+  const [selectedSection, setSelectedSection] = useState<string | null>(null);
   const [selectedTerm, setSelectedTerm] = useState("midterm");
   const [selectedSemester, setSelectedSemester] = useState("1st");
 
-  const courseInfo = {
-    code: "CS101",
-    title: "Introduction to the Philosophy of the Human",
-    teacher: "Aleck Jean F. Siscar",
-    section: "12-Polaris",
+  const [academicPeriods, setAcademicPeriods] = useState<any[]>([]);
+  const [selectedPeriodId, setSelectedPeriodId] = useState<string | null>(null);
+
+  const [courses, setCourses] = useState<any[]>([]);
+  const [sections, setSections] = useState<any[]>([]);
+  const [students, setStudents] = useState<any[]>([]);
+  const [activities, setActivities] = useState<any[]>([]);
+  const [loading, setLoading] = useState({ periods: false, courses: false, sections: false, students: false, activities: false });
+
+  const [courseInfo, setCourseInfo] = useState({ code: "", title: "", teacher: "", section: "" });
+
+  // Helper to categorize activities by grading component
+  const categorizeActivities = (activities: any[]) => {
+    const written: any[] = []; // quiz, assignment, other
+    const performance: any[] = []; // project, laboratory, performance
+    const exam: any[] = []; // midterm, final
+
+    activities.forEach(act => {
+      const type = (act.type || '').toLowerCase();
+      if (['quiz', 'assignment', 'other'].includes(type)) {
+        written.push(act);
+      } else if (['project', 'laboratory', 'performance'].includes(type)) {
+        performance.push(act);
+      } else if (['midterm', 'final'].includes(type)) {
+        exam.push(act);
+      }
+    });
+
+    return { written, performance, exam };
   };
 
-  const [grades] = useState([
-    { id: "2024001", name: "Alagasi, Hyden Cristia A.", written: [10, 10, 91, 10, 8, 8, 38, 85], performance: [30, 15, 0, 0, 0], exam: 60 },
-    { id: "2024002", name: "Algoy, Ann Ruslyn My Tolentino", written: [10, 10, 80, 8, 8, 8, 25, 85], performance: [30, 14, 0, 0, 0], exam: 31 },
-    { id: "2024003", name: "Alvarez, Jezzabel Orallo", written: [10, 10, 84, 10, 8, 8, 25, 85], performance: [30, 15, 0, 0, 0], exam: 38 },
-    { id: "2024004", name: "Ariola, Marienyque Angel R.", written: [10, 10, 98, 10, 8, 8, 45, 85], performance: [30, 15, 0, 0, 0], exam: 49 },
-    { id: "2024005", name: "Austria, Jaila Marie Amiten", written: [10, 10, 88, 10, 8, 8, 32, 85], performance: [30, 13, 0, 0, 0], exam: 17 },
-  ]);
+  // Helper to get student grade for an activity
+  const getStudentGrade = (studentId: string, activityId: string) => {
+    const student = students.find(s => String(s.id) === String(studentId));
+    if (!student || !student.grades) return null;
+    
+    const gradeRecord = student.grades.find((g: any) => String(g.activity_id) === String(activityId));
+    return gradeRecord ? parseFloat(gradeRecord.grade ?? 0) : 0;
+  };
+
+  // Helper to calculate weighted scores
+  const calculateGrades = (studentId: string, categorized: any) => {
+    // Written Works (30%)
+    let writtenTotal = 0;
+    let writtenMax = 0;
+    categorized.written.forEach((act: any) => {
+      const grade = getStudentGrade(studentId, act.id);
+      writtenTotal += grade;
+      writtenMax += parseFloat(act.max_score ?? 0);
+    });
+    const writtenPS = writtenMax > 0 ? (writtenTotal / writtenMax) * 100 : 0;
+    const writtenWS = (writtenPS / 100) * 30;
+
+    // Performance Tasks (40%)
+    let performanceTotal = 0;
+    let performanceMax = 0;
+    categorized.performance.forEach((act: any) => {
+      const grade = getStudentGrade(studentId, act.id);
+      performanceTotal += grade;
+      performanceMax += parseFloat(act.max_score ?? 0);
+    });
+    const performancePS = performanceMax > 0 ? (performanceTotal / performanceMax) * 100 : 0;
+    const performanceWS = (performancePS / 100) * 40;
+
+    // Exam (30%)
+    let examTotal = 0;
+    let examMax = 0;
+    categorized.exam.forEach((act: any) => {
+      const grade = getStudentGrade(studentId, act.id);
+      examTotal += grade;
+      examMax += parseFloat(act.max_score ?? 0);
+    });
+    const examPS = examMax > 0 ? (examTotal / examMax) * 100 : 0;
+    const examWS = (examPS / 100) * 30;
+
+    const initialGrade = writtenWS + performanceWS + examWS;
+    const finalGrade = transmute(initialGrade);
+
+    return {
+      written: { total: writtenTotal, max: writtenMax, ps: writtenPS, ws: writtenWS },
+      performance: { total: performanceTotal, max: performanceMax, ps: performancePS, ws: performanceWS },
+      exam: { total: examTotal, max: examMax, ps: examPS, ws: examWS },
+      initialGrade,
+      finalGrade
+    };
+  };
+
+  // Build an empty grade row for a student when no grades exist yet
+  const makeEmptyGradeRow = (s: any) => ({ id: String(s.id ?? s.student_id ?? s.user_id ?? s.id ?? ''), name: s.name ?? `${s.first_name ?? ''} ${s.last_name ?? ''}`, grades: [] });
 
   const transmute = (percentage: number): string => {
     if (percentage >= 97) return "1.00";
@@ -63,6 +140,214 @@ const GradeInput = () => {
   const handleSaveGrades = () => {
     alert("Grades saved successfully!");
   };
+
+  // Fetch academic periods and teacher assignments (courses) on mount
+  useEffect(() => {
+    let mounted = true;
+    const fetchInitial = async () => {
+      try {
+        setLoading((l) => ({ ...l, periods: true, courses: true }));
+        // academic periods
+        try {
+          const pRes = await apiGet(API_ENDPOINTS.ACADEMIC_PERIODS);
+          const plist = pRes.data ?? pRes.periods ?? pRes ?? [];
+          if (mounted && Array.isArray(plist)) {
+            setAcademicPeriods(plist);
+            const active = plist.find((p: any) => p.status === 'active');
+            if (active) {
+              setSelectedPeriodId(String(active.id ?? active));
+              // derive short semester (1st / 2nd / Summer)
+              const s = (active.semester || '').toLowerCase();
+              if (s.includes('1st')) setSelectedSemester('1st');
+              else if (s.includes('2nd')) setSelectedSemester('2nd');
+              else setSelectedSemester('summer');
+            }
+          }
+        } catch (e) {
+          // ignore
+        }
+
+        // teacher assignments -> courses
+        try {
+          const tRes = await apiGet(`${API_ENDPOINTS.TEACHER_ASSIGNMENTS}/my`);
+          const tlist = tRes.data ?? tRes.assignments ?? tRes ?? [];
+          if (mounted && Array.isArray(tlist)) {
+            // Map to course objects (handle different shapes)
+            const mapped = tlist.map((a: any) => {
+              const subj = a.subject ?? a;
+              return {
+                id: a.id ?? a.subject_id ?? subj.id ?? subj.subject_id,
+                code: subj.course_code ?? subj.code ?? a.course_code ?? a.code,
+                title: subj.course_name ?? subj.title ?? subj.name ?? a.course_name,
+                semester: subj.semester ?? a.semester ?? null,
+                year_level: subj.year_level ?? a.year_level ?? null,
+                teacher: a.teacher_name ?? (user?.name ?? ''),
+                sections: Array.isArray(a.sections) ? a.sections.map((s: any) => ({ id: s.id ?? s.section_id, name: s.name ?? s.title })) : (Array.isArray(subj.sections) ? subj.sections.map((s: any) => ({ id: s.id ?? s.section_id, name: s.name ?? s.title })) : []),
+              };
+            });
+            setCourses(mapped);
+            if (mapped.length > 0) {
+              setSelectedCourse(String(mapped[0].id));
+              setCourseInfo({ code: mapped[0].code ?? '', title: mapped[0].title ?? '', teacher: mapped[0].teacher ?? (user?.name ?? ''), section: mapped[0].sections && mapped[0].sections[0] ? mapped[0].sections[0].name : '' });
+              // set sections for first course
+              setSections(mapped[0].sections ?? []);
+              if (mapped[0].sections && mapped[0].sections.length > 0) {
+                setSelectedSection(String(mapped[0].sections[0].id));
+              }
+            }
+          }
+        } catch (e) {
+          // fallback: try fetch subjects list
+          try {
+            const sres = await apiGet(API_ENDPOINTS.SUBJECTS);
+            const slist = sres.data ?? sres.subjects ?? sres ?? [];
+            if (mounted && Array.isArray(slist) && slist.length > 0) {
+              const mapped = slist.map((s: any) => ({ id: s.id, code: s.course_code, title: s.course_name, semester: s.semester ?? null, year_level: s.year_level ?? null, sections: Array.isArray(s.sections) ? s.sections.map((x: any) => ({ id: x.id, name: x.name })) : [] }));
+              setCourses(mapped);
+              if (mapped.length > 0) {
+                setSelectedCourse(String(mapped[0].id));
+                setCourseInfo({ code: mapped[0].code ?? '', title: mapped[0].title ?? '', teacher: user?.name ?? '', section: mapped[0].sections && mapped[0].sections[0] ? mapped[0].sections[0].name : '' });
+                setSections(mapped[0].sections ?? []);
+                if (mapped[0].sections && mapped[0].sections.length > 0) setSelectedSection(String(mapped[0].sections[0].id));
+              }
+            }
+          } catch (e) {}
+        }
+      } finally {
+        setLoading((l) => ({ ...l, periods: false, courses: false }));
+      }
+    };
+    fetchInitial();
+    return () => { mounted = false; };
+  }, [user]);
+
+  // When selectedSemester changes, filter courses by semester
+  useEffect(() => {
+    if (!selectedSemester || !courses.length) return;
+    
+    // Filter courses to show only those matching selected semester
+    const filteredCourses = courses.filter((c) => {
+      if (!c.semester) return true; // Include if no semester specified
+      const courseSemester = (c.semester || '').toLowerCase();
+      let matchesSemester = false;
+      
+      if (selectedSemester === '1st' && courseSemester.includes('1st')) matchesSemester = true;
+      else if (selectedSemester === '2nd' && courseSemester.includes('2nd')) matchesSemester = true;
+      else if (selectedSemester === 'summer' && courseSemester.includes('summer')) matchesSemester = true;
+      
+      return matchesSemester;
+    });
+
+    // If filtered list is empty, show all courses as fallback
+    const courseList = filteredCourses.length > 0 ? filteredCourses : courses;
+    
+    // Reset course selection if currently selected course is not in filtered list
+    if (selectedCourse && !courseList.find((c) => String(c.id) === String(selectedCourse))) {
+      if (courseList.length > 0) {
+        const firstCourse = courseList[0];
+        setSelectedCourse(String(firstCourse.id));
+        setSections(firstCourse.sections ?? []);
+        setCourseInfo({ code: firstCourse.code ?? '', title: firstCourse.title ?? '', teacher: firstCourse.teacher ?? (user?.name ?? ''), section: firstCourse.sections && firstCourse.sections[0] ? firstCourse.sections[0].name : '' });
+        if (firstCourse.sections && firstCourse.sections.length > 0) {
+          setSelectedSection(String(firstCourse.sections[0].id));
+        }
+      } else {
+        setSelectedCourse(null);
+        setSections([]);
+        setSelectedSection(null);
+      }
+    }
+  }, [selectedSemester, courses]);
+
+  // When selectedCourse changes, update sections and courseInfo
+  useEffect(() => {
+    if (!selectedCourse) return;
+    const found = courses.find((c) => String(c.id) === String(selectedCourse));
+    if (found) {
+      setSections(found.sections ?? []);
+      setCourseInfo({ code: found.code ?? '', title: found.title ?? '', teacher: found.teacher ?? (user?.name ?? ''), section: found.sections && found.sections[0] ? found.sections[0].name : '' });
+      if ((!selectedSection || String(selectedSection) === 'null') && found.sections && found.sections.length > 0) {
+        setSelectedSection(String(found.sections[0].id));
+      }
+    }
+  }, [selectedCourse, courses, user]);
+
+  // When selectedSection or selectedTerm changes, fetch activities
+  useEffect(() => {
+    let mounted = true;
+    const fetchActivities = async () => {
+      if (!selectedCourse || !selectedSection || !selectedTerm) return;
+      try {
+        setLoading((l) => ({ ...l, activities: true }));
+        
+        // Map term to grading_period
+        const gradingPeriod = selectedTerm === 'midterm' ? 'midterm' : 'final';
+        
+        const res = await apiGet(`${API_ENDPOINTS.ACTIVITIES}?course_id=${encodeURIComponent(String(selectedCourse))}&section_id=${encodeURIComponent(String(selectedSection))}&grading_period=${gradingPeriod}`);
+        const list = res.data ?? res.activities ?? res ?? [];
+        
+        if (mounted && Array.isArray(list)) {
+          setActivities(list);
+        } else {
+          setActivities([]);
+        }
+      } catch (e) {
+        console.error('Failed to fetch activities:', e);
+        setActivities([]);
+      } finally {
+        setLoading((l) => ({ ...l, activities: false }));
+      }
+    };
+    fetchActivities();
+    return () => { mounted = false; };
+  }, [selectedCourse, selectedSection, selectedTerm]);
+
+  // When selectedSection changes, fetch students for that section
+  useEffect(() => {
+    let mounted = true;
+    const fetchStudents = async () => {
+      if (!selectedSection || !selectedCourse) return;
+      try {
+        setLoading((l) => ({ ...l, students: true }));
+        // Get year level from selected course
+        const course = courses.find((c) => String(c.id) === String(selectedCourse));
+        const yearLevel = course?.year_level ?? null;
+        
+        // Build query with section_id and optionally year_level
+        let query = `section_id=${encodeURIComponent(String(selectedSection))}`;
+        if (yearLevel) {
+          query += `&year_level=${encodeURIComponent(String(yearLevel))}`;
+        }
+        // Include grades in the response
+        query += `&include_grades=true`;
+        
+        const res = await apiGet(`${API_ENDPOINTS.STUDENTS}?${query}`);
+        const list = res.data ?? res.students ?? res ?? [];
+        if (mounted && Array.isArray(list)) {
+          // Map backend student shape to UI student rows
+          const mapped = list.map((st: any) => {
+            return {
+              id: st.student_id ?? st.id ?? st.user_id ?? String(st.id),
+              name: st.name ?? `${st.first_name ?? ''} ${st.last_name ?? ''}`,
+              email: st.email ?? st.user_email ?? '',
+              status: st.status ?? 'active',
+              grades: st.grades ?? st.activity_grades ?? []
+            };
+          });
+          setStudents(mapped);
+        } else {
+          setStudents([]);
+        }
+      } catch (e) {
+        console.error('Failed to fetch students:', e);
+        setStudents([]);
+      } finally {
+        setLoading((l) => ({ ...l, students: false }));
+      }
+    };
+    fetchStudents();
+    return () => { mounted = false; };
+  }, [selectedSection, selectedCourse, courses]);
 
   if (!isAuthenticated) return null;
 
@@ -96,14 +381,24 @@ const GradeInput = () => {
           <CardContent className="pt-6">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
               <div>
-                <Label className="text-xs text-muted-foreground">Semester</Label>
-                <Select value={selectedSemester} onValueChange={setSelectedSemester}>
+                <Label className="text-xs text-muted-foreground">Semester / Period</Label>
+                <Select value={selectedPeriodId ?? undefined} onValueChange={(v) => {
+                  setSelectedPeriodId(v);
+                  const p = academicPeriods.find((x) => String(x.id) === String(v));
+                  if (p) {
+                    const s = (p.semester || '').toLowerCase();
+                    if (s.includes('1st')) setSelectedSemester('1st');
+                    else if (s.includes('2nd')) setSelectedSemester('2nd');
+                    else setSelectedSemester('summer');
+                  }
+                }}>
                   <SelectTrigger className="h-9">
-                    <SelectValue />
+                    <SelectValue placeholder="Select period" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="1st">1st Semester</SelectItem>
-                    <SelectItem value="2nd">2nd Semester</SelectItem>
+                    {academicPeriods.map((p) => (
+                      <SelectItem key={p.id} value={String(p.id)}>{`${p.school_year} • ${p.semester}`}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -121,25 +416,36 @@ const GradeInput = () => {
               </div>
               <div>
                 <Label className="text-xs text-muted-foreground">Course</Label>
-                <Select value={selectedCourse} onValueChange={setSelectedCourse}>
+                <Select value={selectedCourse ?? undefined} onValueChange={(v) => setSelectedCourse(v)}>
                   <SelectTrigger className="h-9">
-                    <SelectValue />
+                    <SelectValue placeholder="Select course" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="cs101">{courseInfo.code} - {courseInfo.title}</SelectItem>
-                    <SelectItem value="cs201">CS201 - Data Structures</SelectItem>
+                    {courses
+                      .filter((c) => {
+                        if (!c.semester || !selectedSemester) return true;
+                        const courseSemester = (c.semester || '').toLowerCase();
+                        if (selectedSemester === '1st') return courseSemester.includes('1st');
+                        if (selectedSemester === '2nd') return courseSemester.includes('2nd');
+                        if (selectedSemester === 'summer') return courseSemester.includes('summer');
+                        return true;
+                      })
+                      .map((c) => (
+                        <SelectItem key={c.id} value={String(c.id)}>{`${c.code ?? ''} - ${c.title ?? ''}`}</SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
               </div>
               <div>
                 <Label className="text-xs text-muted-foreground">Section</Label>
-                <Select value={selectedSection} onValueChange={setSelectedSection}>
+                <Select value={selectedSection ?? undefined} onValueChange={(v) => setSelectedSection(v)}>
                   <SelectTrigger className="h-9">
-                    <SelectValue />
+                    <SelectValue placeholder="Select section" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="12-polaris">12-Polaris</SelectItem>
-                    <SelectItem value="12-sirius">12-Sirius</SelectItem>
+                    {sections.map((s) => (
+                      <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -154,7 +460,7 @@ const GradeInput = () => {
                 </div>
                 <div className="text-right">
                   <Badge variant="outline" className="text-xs">
-                    {selectedSemester} Semester - {selectedTerm === "midterm" ? "Midterm" : "Final Term"}
+                    {academicPeriods.find((p) => String(p.id) === String(selectedPeriodId)) ? `${academicPeriods.find((p) => String(p.id) === String(selectedPeriodId)).school_year} - ${academicPeriods.find((p) => String(p.id) === String(selectedPeriodId)).semester}` : `${selectedSemester} Semester - ${selectedTerm === "midterm" ? "Midterm" : "Final Term"}`}
                   </Badge>
                 </div>
               </div>
@@ -189,7 +495,7 @@ const GradeInput = () => {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="overflow-x-auto overflow-y-auto max-h-[600px] border rounded-lg">
+                <div className="overflow-x-auto overflow-y-auto max-h-[600px] border rounded-lg">
               <table className="w-full border-collapse text-xs">
                 <thead className="sticky top-0 z-20">
                   <tr className="border-b-2 border-border">
@@ -216,15 +522,25 @@ const GradeInput = () => {
                   <tr className="border-b border-border bg-muted/50">
                     <th className="p-2 text-left text-xs font-medium sticky left-0 z-30 bg-muted/50 border-r border-border">ID / Name</th>
                     {/* Written sub-columns */}
-                    {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
-                      <th key={`w${i}`} className="p-1 text-center font-medium w-12 bg-table-written/50">{i}</th>
+                    {categorizeActivities(activities).written.map((act, idx) => (
+                      <th key={`wh${idx}`} className="p-1 text-center font-medium w-12 bg-table-written/50" title={act.title}>
+                        {act.title.length > 10 ? act.title.substring(0, 10) + '...' : act.title}
+                      </th>
+                    ))}
+                    {Array.from({ length: Math.max(0, 8 - categorizeActivities(activities).written.length) }).map((_, i) => (
+                      <th key={`whe${i}`} className="p-1 text-center font-medium w-12 bg-table-written/50">-</th>
                     ))}
                     <th className="p-1 text-center font-medium w-12 bg-table-written/50">Total</th>
                     <th className="p-1 text-center font-medium w-12 bg-table-written/50">PS</th>
                     <th className="p-1 text-center font-medium w-12 bg-table-written border-r border-border">WS</th>
                     {/* Performance sub-columns */}
-                    {[1, 2, 3, 4, 5].map((i) => (
-                      <th key={`p${i}`} className="p-1 text-center font-medium w-12 bg-table-performance/50">{i}</th>
+                    {categorizeActivities(activities).performance.map((act, idx) => (
+                      <th key={`ph${idx}`} className="p-1 text-center font-medium w-12 bg-table-performance/50" title={act.title}>
+                        {act.title.length > 10 ? act.title.substring(0, 10) + '...' : act.title}
+                      </th>
+                    ))}
+                    {Array.from({ length: Math.max(0, 5 - categorizeActivities(activities).performance.length) }).map((_, i) => (
+                      <th key={`phe${i}`} className="p-1 text-center font-medium w-12 bg-table-performance/50">-</th>
                     ))}
                     <th className="p-1 text-center font-medium w-12 bg-table-performance/50">Total</th>
                     <th className="p-1 text-center font-medium w-12 bg-table-performance/50">PS</th>
@@ -239,26 +555,28 @@ const GradeInput = () => {
                   </tr>
                   <tr className="border-b border-border bg-muted/30 text-[10px]">
                     <th className="p-1 text-right font-medium sticky left-0 z-30 bg-muted/30 border-r border-border">HPS →</th>
-                    <th className="p-1 text-center text-muted-foreground bg-table-written/30">10</th>
-                    <th className="p-1 text-center text-muted-foreground bg-table-written/30">10</th>
-                    <th className="p-1 text-center text-muted-foreground bg-table-written/30">100</th>
-                    <th className="p-1 text-center text-muted-foreground bg-table-written/30">10</th>
-                    <th className="p-1 text-center text-muted-foreground bg-table-written/30">10</th>
-                    <th className="p-1 text-center text-muted-foreground bg-table-written/30">10</th>
-                    <th className="p-1 text-center text-muted-foreground bg-table-written/30">50</th>
-                    <th className="p-1 text-center text-muted-foreground bg-table-written/30">100</th>
-                    <th className="p-1 text-center text-muted-foreground bg-table-written/30">300</th>
+                    {/* Written Works HPS */}
+                    {categorizeActivities(activities).written.map((act, idx) => (
+                      <th key={`whps${idx}`} className="p-1 text-center text-muted-foreground bg-table-written/30">{act.max_score}</th>
+                    ))}
+                    {Array.from({ length: Math.max(0, 8 - categorizeActivities(activities).written.length) }).map((_, i) => (
+                      <th key={`whpse${i}`} className="p-1 text-center text-muted-foreground bg-table-written/30">-</th>
+                    ))}
+                    <th className="p-1 text-center text-muted-foreground bg-table-written/30">{categorizeActivities(activities).written.reduce((sum, act) => sum + parseFloat(act.max_score ?? 0), 0)}</th>
                     <th className="p-1 text-center text-muted-foreground bg-table-written/30">100%</th>
                     <th className="p-1 text-center text-muted-foreground bg-table-written border-r border-border">30%</th>
-                    <th className="p-1 text-center text-muted-foreground bg-table-performance/30">30</th>
-                    <th className="p-1 text-center text-muted-foreground bg-table-performance/30">15</th>
-                    <th className="p-1 text-center text-muted-foreground bg-table-performance/30">-</th>
-                    <th className="p-1 text-center text-muted-foreground bg-table-performance/30">-</th>
-                    <th className="p-1 text-center text-muted-foreground bg-table-performance/30">-</th>
-                    <th className="p-1 text-center text-muted-foreground bg-table-performance/30">45</th>
+                    {/* Performance Tasks HPS */}
+                    {categorizeActivities(activities).performance.map((act, idx) => (
+                      <th key={`phps${idx}`} className="p-1 text-center text-muted-foreground bg-table-performance/30">{act.max_score}</th>
+                    ))}
+                    {Array.from({ length: Math.max(0, 5 - categorizeActivities(activities).performance.length) }).map((_, i) => (
+                      <th key={`phpsee${i}`} className="p-1 text-center text-muted-foreground bg-table-performance/30">-</th>
+                    ))}
+                    <th className="p-1 text-center text-muted-foreground bg-table-performance/30">{categorizeActivities(activities).performance.reduce((sum, act) => sum + parseFloat(act.max_score ?? 0), 0)}</th>
                     <th className="p-1 text-center text-muted-foreground bg-table-performance/30">100%</th>
                     <th className="p-1 text-center text-muted-foreground bg-table-performance border-r border-border">40%</th>
-                    <th className="p-1 text-center text-muted-foreground bg-table-exam/30">60</th>
+                    {/* Exam HPS */}
+                    <th className="p-1 text-center text-muted-foreground bg-table-exam/30">{categorizeActivities(activities).exam.reduce((sum, act) => sum + parseFloat(act.max_score ?? 0), 0)}</th>
                     <th className="p-1 text-center text-muted-foreground bg-table-exam/30">100%</th>
                     <th className="p-1 text-center text-muted-foreground bg-table-exam border-r border-border">30%</th>
                     <th className="p-1 text-center text-muted-foreground bg-table-total/30">100%</th>
@@ -266,20 +584,9 @@ const GradeInput = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {grades.map((student, idx) => {
-                    const writtenTotal = student.written.reduce((a, b) => a + b, 0);
-                    const writtenPS = ((writtenTotal / 300) * 100).toFixed(2);
-                    const writtenWS = parseFloat(((writtenTotal / 300) * 30).toFixed(2));
-                    
-                    const performanceTotal = student.performance.reduce((a, b) => a + b, 0);
-                    const performancePS = ((performanceTotal / 45) * 100).toFixed(2);
-                    const performanceWS = parseFloat(((performanceTotal / 45) * 40).toFixed(2));
-                    
-                    const examPS = ((student.exam / 60) * 100).toFixed(2);
-                    const examWS = parseFloat(((student.exam / 60) * 30).toFixed(2));
-                    
-                    const initialGrade = writtenWS + performanceWS + examWS;
-                    const finalGrade = transmute(initialGrade);
+                  {students.map((student, idx) => {
+                    const categorized = categorizeActivities(activities);
+                    const grades = calculateGrades(student.id, categorized);
 
                     return (
                       <tr key={idx} className="border-b border-border hover:bg-muted/30 transition-colors">
@@ -289,54 +596,66 @@ const GradeInput = () => {
                             <p className="text-[10px] text-muted-foreground">{student.id}</p>
                           </div>
                         </td>
-                        {/* Written Works */}
-                        {student.written.map((score) => (
-                          <td key={`w${score}`} className="p-1 text-center bg-table-written/20">
-                            <div className="text-xs">{score}</div>
+                        {/* Written Works - Individual Scores */}
+                        {categorized.written.map((act, actIdx) => (
+                          <td key={`w${actIdx}`} className="p-1 text-center bg-table-written/20">
+                            <div className="text-xs">{getStudentGrade(student.id, act.id) || '-'}</div>
+                          </td>
+                        ))}
+                        {/* Fill empty columns if less than 8 activities */}
+                        {Array.from({ length: Math.max(0, 8 - categorized.written.length) }).map((_, i) => (
+                          <td key={`we${i}`} className="p-1 text-center bg-table-written/20">
+                            <div className="text-xs text-muted-foreground">-</div>
                           </td>
                         ))}
                         <td className="p-1 text-center font-semibold bg-table-written/30 text-xs">
-                          {writtenTotal}
+                          {grades.written.total.toFixed(0)}
                         </td>
                         <td className="p-1 text-center font-medium bg-table-written/30 text-xs">
-                          {writtenPS}%
+                          {grades.written.ps.toFixed(2)}%
                         </td>
                         <td className="p-1 text-center font-semibold bg-table-written border-r border-border text-xs">
-                          {writtenWS.toFixed(2)}
+                          {grades.written.ws.toFixed(2)}
                         </td>
-                        {/* Performance */}
-                        {student.performance.map((score) => (
-                          <td key={`p${score}`} className="p-1 text-center bg-table-performance/20">
-                            <div className="text-xs">{score}</div>
+                        {/* Performance Tasks - Individual Scores */}
+                        {categorized.performance.map((act, actIdx) => (
+                          <td key={`p${actIdx}`} className="p-1 text-center bg-table-performance/20">
+                            <div className="text-xs">{getStudentGrade(student.id, act.id) || '-'}</div>
+                          </td>
+                        ))}
+                        {/* Fill empty columns if less than 5 activities */}
+                        {Array.from({ length: Math.max(0, 5 - categorized.performance.length) }).map((_, i) => (
+                          <td key={`pe${i}`} className="p-1 text-center bg-table-performance/20">
+                            <div className="text-xs text-muted-foreground">-</div>
                           </td>
                         ))}
                         <td className="p-1 text-center font-semibold bg-table-performance/30 text-xs">
-                          {performanceTotal}
+                          {grades.performance.total.toFixed(0)}
                         </td>
                         <td className="p-1 text-center font-medium bg-table-performance/30 text-xs">
-                          {performancePS}%
+                          {grades.performance.ps.toFixed(2)}%
                         </td>
                         <td className="p-1 text-center font-semibold bg-table-performance border-r border-border text-xs">
-                          {performanceWS.toFixed(2)}
+                          {grades.performance.ws.toFixed(2)}
                         </td>
                         {/* Exam */}
                         <td className="p-1 text-center bg-table-exam/20">
-                          <div className="text-xs">{student.exam}</div>
+                          <div className="text-xs">{grades.exam.total.toFixed(0)}</div>
                         </td>
                         <td className="p-1 text-center font-medium bg-table-exam/30 text-xs">
-                          {examPS}%
+                          {grades.exam.ps.toFixed(2)}%
                         </td>
                         <td className="p-1 text-center font-semibold bg-table-exam border-r border-border text-xs">
-                          {examWS.toFixed(2)}
+                          {grades.exam.ws.toFixed(2)}
                         </td>
                         {/* Totals */}
                         <td className="p-1 text-center font-bold bg-table-total/30 text-xs">
-                          {initialGrade.toFixed(2)}
+                          {grades.initialGrade.toFixed(2)}
                         </td>
                         <td className={`p-1 text-center font-bold text-xs ${
-                          parseFloat(finalGrade) <= 3.0 ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
+                          parseFloat(grades.finalGrade) <= 3.0 ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
                         }`}>
-                          {finalGrade}
+                          {grades.finalGrade}
                         </td>
                       </tr>
                     );
@@ -347,7 +666,7 @@ const GradeInput = () => {
             
             <div className="mt-4 flex items-center justify-between">
               <div className="text-xs text-muted-foreground space-y-1">
-                <p>Total Students: {grades.length}</p>
+                <p>Total Students: {students.length}</p>
                 <p className="text-[10px]">
                   <span className="font-medium">HPS</span> = Highest Possible Score • 
                   <span className="font-medium"> PS</span> = Percentage Score • 

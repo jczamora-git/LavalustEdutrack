@@ -93,14 +93,14 @@ $autoload['helpers'] = array('url','api','spreadsheet','mail','email_templates')
 |	$autoload['models'] = array('model1_model', 'model2_model')
 */
 $autoload['models'] = array('UserModel',
-                        'TeacherModel',
-                        'StudentModel',
-                        'SectionModel',
-                        'TeacherSubjectModel',
-                        'SubjectModel',
-                        'YearLevelModel',
-                        'YearLevelSectionModel',
-                        'StudentSubjectModel',
+                    'TeacherModel',
+                    'StudentModel',
+                    'SectionModel',
+                    'TeacherSubjectModel',
+                    'SubjectModel',
+                    'YearLevelModel',
+                    'YearLevelSectionModel',
+                    'StudentSubjectModel',
                     'ActivityModel',);
 
 /*

@@ -45,6 +45,8 @@ export const API_ENDPOINTS = {
   ACTIVITIES: `${API_BASE_URL}/api/activities`,
   ACTIVITY_BY_ID: (id: string | number) => `${API_BASE_URL}/api/activities/${id}`,
   ACTIVITY_GRADES: (id: string | number) => `${API_BASE_URL}/api/activities/${id}/grades`,
+  // Academic periods
+  ACADEMIC_PERIODS: `${API_BASE_URL}/api/academic-periods`,
 };
 
 // API helper functions

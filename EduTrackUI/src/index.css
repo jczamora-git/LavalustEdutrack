@@ -222,3 +222,11 @@ input[type="number"] {
     border-color: hsl(var(--table-total-border));
   }
 }
+
+@layer utilities {
+  .bg-edu-gradient {
+    background: linear-gradient(120deg, #e6f0ff 0%, #f3f6ff 55%, #ffffff 100%);
+  }
+}
+
+/* Scrollbars are provided by the `tailwind-scrollbar` plugin. */

@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: localhost:3306
--- Generation Time: Nov 13, 2025 at 07:20 PM
+-- Generation Time: Nov 14, 2025 at 07:53 PM
 -- Server version: 8.4.3
 -- PHP Version: 8.3.26
 
@@ -29,12 +29,12 @@ SET time_zone = "+00:00";
 
 CREATE TABLE `academic_periods` (
   `id` int UNSIGNED NOT NULL,
-  `school_year` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'e.g., 2024-2025, 2025-2026',
-  `semester` enum('1st Semester','2nd Semester','Summer') COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'Semester within the school year',
+  `school_year` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'e.g., 2024-2025, 2025-2026',
+  `semester` enum('1st Semester','2nd Semester','Summer') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'Semester within the school year',
   `start_date` date NOT NULL COMMENT 'Period start date',
   `end_date` date NOT NULL COMMENT 'Period end date',
-  `status` enum('active','past','upcoming') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'upcoming' COMMENT 'Current status of the period',
-  `description` text COLLATE utf8mb4_unicode_ci COMMENT 'Optional notes about this period',
+  `status` enum('active','past','upcoming') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'upcoming' COMMENT 'Current status of the period',
+  `description` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci COMMENT 'Optional notes about this period',
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Global academic period tracking (school year + semester)';
@@ -59,8 +59,8 @@ INSERT INTO `academic_periods` (`id`, `school_year`, `semester`, `start_date`, `
 CREATE TABLE `activities` (
   `id` bigint UNSIGNED NOT NULL,
   `course_id` bigint UNSIGNED NOT NULL,
-  `title` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `type` enum('assignment','quiz','midterm','final','project','laboratory','performance','other') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'assignment',
+  `title` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `type` enum('assignment','quiz','midterm','final','project','laboratory','performance','other') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'assignment',
   `max_score` decimal(10,2) NOT NULL DEFAULT '100.00',
   `due_at` datetime DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -72,9 +72,20 @@ CREATE TABLE `activities` (
 --
 
 INSERT INTO `activities` (`id`, `course_id`, `title`, `type`, `max_score`, `due_at`, `created_at`, `section_id`) VALUES
-(6, 6, 'Test Assignment', 'assignment', 100.00, NULL, '2025-11-10 20:53:12', 1),
-(7, 6, 'Test Quiz', 'quiz', 100.00, NULL, '2025-11-10 20:53:21', 1),
-(8, 6, 'Test Assignment 2', 'assignment', 45.00, NULL, '2025-11-10 22:44:55', 1);
+(10, 6, 'Introduction to C# Syntax', 'assignment', 100.00, '2025-11-15 00:00:00', '2025-11-14 08:34:22', 1),
+(13, 6, 'Variables and Data Types Quiz', 'quiz', 50.00, '2025-11-15 00:00:00', '2025-11-14 08:41:07', 1),
+(14, 6, 'Midterm Exam: C# Fundamentals', 'midterm', 100.00, '2025-11-15 00:00:00', '2025-11-14 08:47:22', 1),
+(15, 6, 'Lab 1: Hello World and Debugging in Visual Studio', 'laboratory', 100.00, '2025-11-14 00:00:00', '2025-11-14 08:47:50', 1),
+(16, 6, 'Recitation 1', 'performance', 25.00, '2025-11-14 00:00:00', '2025-11-14 08:48:29', 1),
+(17, 6, 'Recitation 2', 'performance', 25.00, '2025-11-14 00:00:00', '2025-11-14 08:48:41', 1),
+(18, 6, 'Recitation 3', 'performance', 25.00, '2025-11-14 00:00:00', '2025-11-14 08:48:56', 1),
+(19, 6, 'Control Structures Practice Exercise', 'assignment', 25.00, '2025-11-14 00:00:00', '2025-11-14 08:49:24', 1),
+(20, 6, 'Object-Oriented Concepts Quiz', 'quiz', 50.00, '2025-11-14 00:00:00', '2025-11-14 08:49:44', 1),
+(21, 6, 'Lab 2: Data Types and Variables in C#', 'laboratory', 100.00, '2025-11-21 23:59:59', '2025-11-14 16:58:13', 1),
+(22, 6, 'Lab 3: Conditional Statements and Loops', 'laboratory', 100.00, '2025-11-28 23:59:59', '2025-11-14 16:58:13', 1),
+(23, 6, 'Lab 4: Methods and Parameter Passing', 'laboratory', 100.00, '2025-12-05 23:59:59', '2025-11-14 16:58:13', 1),
+(24, 6, 'Lab 5: Arrays and Collections', 'laboratory', 100.00, '2025-12-12 23:59:59', '2025-11-14 16:58:13', 1),
+(25, 6, 'Lab 6: Introduction to Classes and Objects', 'laboratory', 100.00, '2025-12-19 23:59:59', '2025-11-14 16:58:13', 1);
 
 -- --------------------------------------------------------
 
@@ -87,21 +98,10 @@ CREATE TABLE `activity_grades` (
   `activity_id` bigint UNSIGNED NOT NULL,
   `student_id` bigint UNSIGNED NOT NULL,
   `grade` decimal(10,2) DEFAULT NULL,
-  `status` enum('Pending','Passed','Failed') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'Pending',
+  `status` enum('Pending','Passed','Failed') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'Pending',
   `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
---
--- Dumping data for table `activity_grades`
---
-
-INSERT INTO `activity_grades` (`id`, `activity_id`, `student_id`, `grade`, `status`, `created_at`, `updated_at`) VALUES
-(21, 6, 347, 87.00, 'Pending', '2025-11-11 01:56:45', '2025-11-11 02:41:53'),
-(22, 6, 336, 10.00, 'Pending', '2025-11-11 02:04:10', '2025-11-11 02:25:21'),
-(23, 6, 324, 78.00, 'Pending', '2025-11-11 02:04:24', '2025-11-11 02:34:25'),
-(24, 6, 326, 44.00, 'Pending', '2025-11-11 02:04:24', '2025-11-11 02:34:23'),
-(25, 6, 240, 90.00, 'Pending', '2025-11-11 02:17:29', '2025-11-11 02:34:20');
 
 -- --------------------------------------------------------
 
@@ -111,8 +111,8 @@ INSERT INTO `activity_grades` (`id`, `activity_id`, `student_id`, `grade`, `stat
 
 CREATE TABLE `password_resets` (
   `id` int UNSIGNED NOT NULL,
-  `email` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `token` varchar(128) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `email` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `token` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `expires_at` datetime NOT NULL,
   `used` tinyint(1) NOT NULL DEFAULT '0',
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -142,7 +142,9 @@ INSERT INTO `password_resets` (`id`, `email`, `token`, `expires_at`, `used`, `cr
 (16, 'jeizi.zamora@gmail.com', '0da38cec28f98b08ee0609aab5d523b2', '2025-11-14 19:32:06', 0, '2025-11-13 19:32:06', '2025-11-13 19:32:06'),
 (17, 'jeizi.zamora@gmail.com', 'ee6f2ac1b07ddbc7f9aa844f6840ca85', '2025-11-14 19:33:18', 0, '2025-11-13 19:33:18', '2025-11-13 19:33:18'),
 (18, 'iamchris.japan@gmail.com', 'c8e1114f849c840b567c20186147cc05', '2025-11-14 20:13:00', 0, '2025-11-13 20:13:00', '2025-11-13 20:13:00'),
-(19, 'iamchris.japan@gmail.com', '67c0d65cfa9c226f065bd2f71b91934c', '2025-11-14 20:13:45', 0, '2025-11-13 20:13:45', '2025-11-13 20:13:45');
+(19, 'iamchris.japan@gmail.com', '67c0d65cfa9c226f065bd2f71b91934c', '2025-11-14 20:13:45', 0, '2025-11-13 20:13:45', '2025-11-13 20:13:45'),
+(20, 'jeizi.zamora@gmail.com', '070ffbcbfb5db7eed2b6589e97b7943a', '2025-11-15 05:32:01', 0, '2025-11-14 05:32:01', '2025-11-14 05:32:01'),
+(21, 'nikaldabasoriano@gmail.com', '863f02a4ff6928b7e6a4e7683807600e', '2025-11-15 05:35:41', 0, '2025-11-14 05:35:41', '2025-11-14 05:35:41');
 
 -- --------------------------------------------------------
 
@@ -152,9 +154,9 @@ INSERT INTO `password_resets` (`id`, `email`, `token`, `expires_at`, `used`, `cr
 
 CREATE TABLE `sections` (
   `id` int UNSIGNED NOT NULL,
-  `name` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `name` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `description` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
-  `status` enum('active','inactive') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'active',
+  `status` enum('active','inactive') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'active',
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -180,10 +182,10 @@ INSERT INTO `sections` (`id`, `name`, `description`, `status`, `created_at`, `up
 CREATE TABLE `students` (
   `id` int UNSIGNED NOT NULL,
   `user_id` int UNSIGNED DEFAULT NULL,
-  `student_id` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `year_level` enum('1st Year','2nd Year','3rd Year','4th Year') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `student_id` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `year_level` enum('1st Year','2nd Year','3rd Year','4th Year') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `section_id` int UNSIGNED DEFAULT NULL,
-  `status` enum('active','inactive') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'active',
+  `status` enum('active','inactive') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'active',
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -537,24 +539,28 @@ INSERT INTO `students` (`id`, `user_id`, `student_id`, `year_level`, `section_id
 (346, 363, 'MCC2025-00345', '2nd Year', 1, 'active', '2025-11-10 12:30:53', '2025-11-10 12:31:44'),
 (347, 364, 'MCC2025-00346', '1st Year', 1, 'active', '2025-11-10 12:30:53', '2025-11-10 12:45:09'),
 (348, 365, 'MCC2025-00347', '1st Year', 5, 'active', '2025-11-10 12:30:53', '2025-11-10 12:31:17'),
-(349, 366, 'MCC2025-00348', '4th Year', NULL, 'active', '2025-11-10 12:30:53', '2025-11-10 19:30:53'),
+(349, 366, 'MCC2025-00348', '4th Year', 1, 'active', '2025-11-10 12:30:53', '2025-11-13 21:29:22'),
 (350, 367, 'MCC2025-00349', '1st Year', 5, 'active', '2025-11-10 12:30:53', '2025-11-10 12:31:18'),
 (351, 368, 'MCC2025-00350', '3rd Year', 1, 'active', '2025-11-10 12:30:53', '2025-11-10 12:46:42'),
-(352, 369, 'MCC2025-00351', '4th Year', NULL, 'active', '2025-11-10 12:30:53', '2025-11-10 19:30:53'),
+(352, 369, 'MCC2025-00351', '4th Year', 1, 'active', '2025-11-10 12:30:53', '2025-11-13 21:29:20'),
 (353, 370, 'MCC2025-00352', '1st Year', 5, 'active', '2025-11-10 12:30:53', '2025-11-10 12:31:19'),
-(354, 371, 'MCC2025-00353', '4th Year', NULL, 'active', '2025-11-10 12:30:53', '2025-11-10 19:30:53'),
-(355, 372, 'MCC2025-00354', '4th Year', NULL, 'active', '2025-11-10 12:30:53', '2025-11-10 19:30:53'),
+(354, 371, 'MCC2025-00353', '4th Year', 1, 'active', '2025-11-10 12:30:53', '2025-11-13 21:29:19'),
+(355, 372, 'MCC2025-00354', '4th Year', 1, 'active', '2025-11-10 12:30:53', '2025-11-13 21:29:18'),
 (356, 373, 'MCC2025-00355', '3rd Year', 1, 'active', '2025-11-10 12:30:53', '2025-11-10 12:46:42'),
 (357, 374, 'MCC2025-00356', '2nd Year', 1, 'active', '2025-11-10 12:30:53', '2025-11-10 12:31:44'),
 (358, 375, 'MCC2025-00357', '3rd Year', 1, 'active', '2025-11-10 12:30:53', '2025-11-10 12:46:41'),
 (359, 376, 'MCC2025-00358', '2nd Year', 1, 'active', '2025-11-10 12:30:54', '2025-11-10 12:31:43'),
-(360, 377, 'MCC2025-00359', '4th Year', NULL, 'active', '2025-11-10 12:30:54', '2025-11-10 19:30:54'),
+(360, 377, 'MCC2025-00359', '4th Year', 1, 'active', '2025-11-10 12:30:54', '2025-11-13 21:29:15'),
 (361, 378, 'MCC2025-00360', '3rd Year', 1, 'active', '2025-11-10 12:30:54', '2025-11-10 12:46:40'),
 (362, 379, 'MCC2025-00361', '3rd Year', 1, 'active', '2025-11-10 12:30:54', '2025-11-10 12:46:41'),
 (363, 380, 'MCC2025-00362', '2nd Year', 1, 'active', '2025-11-10 12:30:54', '2025-11-10 12:31:44'),
-(364, 381, 'MCC2025-00363', '4th Year', NULL, 'active', '2025-11-10 12:30:54', '2025-11-10 19:30:54'),
+(364, 381, 'MCC2025-00363', '4th Year', 1, 'active', '2025-11-10 12:30:54', '2025-11-13 21:29:17'),
 (379, 398, 'MCC2025-00364', '1st Year', NULL, 'active', '2025-11-13 10:28:17', '2025-11-13 10:28:17'),
-(386, 405, 'MCC2025-00365', '2nd Year', NULL, 'active', '2025-11-13 12:16:01', '2025-11-13 19:16:01');
+(386, 405, 'MCC2025-00365', '2nd Year', NULL, 'active', '2025-11-13 12:16:01', '2025-11-13 19:16:01'),
+(387, 406, 'MCC2025-00366', '3rd Year', NULL, 'active', '2025-11-13 21:27:39', '2025-11-14 04:27:39'),
+(388, 407, 'MCC2025-00367', '3rd Year', NULL, 'active', '2025-11-13 21:29:55', '2025-11-14 04:29:55'),
+(389, 408, 'MCC2025-00368', '3rd Year', NULL, 'active', '2025-11-13 21:29:55', '2025-11-14 04:29:55'),
+(390, 409, 'MCC2025-00369', '3rd Year', NULL, 'active', '2025-11-13 21:29:55', '2025-11-14 04:29:55');
 
 -- --------------------------------------------------------
 
@@ -608,7 +614,7 @@ INSERT INTO `subjects` (`id`, `course_code`, `course_name`, `credits`, `category
 (12, 'ITP 122', 'Introduction to Human Computer Interaction 1', 3, 'major', '1st Year', '2nd Semester', 'active', '2025-11-06 15:37:00', '2025-11-06 15:37:00'),
 (13, 'ITE 121', 'Electronics with Technical Drawing', 3, 'major', '1st Year', '2nd Semester', 'active', '2025-11-06 15:37:00', '2025-11-06 15:37:00'),
 (14, 'NSTP 2', 'National Service Training Program 2', 3, 'major', '1st Year', '2nd Semester', 'active', '2025-11-06 15:37:00', '2025-11-10 10:36:38'),
-(15, 'Eng 002', 'Business Communication', 3, 'general_education', '1st Year', '1st Semester', 'active', '2025-11-06 15:37:54', '2025-11-10 09:02:18'),
+(15, 'Eng 002', 'Business Communication', 3, 'general_education', '1st Year', '1st Semester', 'active', '2025-11-06 15:37:54', '2025-11-13 21:29:01'),
 (16, 'ITC 211', 'Data Structures with Algorithm', 3, 'major', '2nd Year', '1st Semester', 'active', '2025-11-06 15:37:54', '2025-11-06 15:37:54'),
 (17, 'ITC 212', 'Information Management', 3, 'major', '2nd Year', '1st Semester', 'active', '2025-11-06 15:37:54', '2025-11-06 15:37:54'),
 (18, 'ITE 211', 'Human Computer Interaction 2', 3, 'major', '2nd Year', '1st Semester', 'active', '2025-11-06 15:37:54', '2025-11-06 15:37:54'),
@@ -632,8 +638,8 @@ INSERT INTO `subjects` (`id`, `course_code`, `course_name`, `credits`, `category
 CREATE TABLE `teachers` (
   `id` int UNSIGNED NOT NULL,
   `user_id` int UNSIGNED NOT NULL,
-  `employee_id` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `status` enum('active','inactive') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'active',
+  `employee_id` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `status` enum('active','inactive') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'active',
   `status_updated_at` timestamp NULL DEFAULT NULL COMMENT 'When status last changed',
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
@@ -677,7 +683,8 @@ INSERT INTO `teacher_subjects` (`id`, `teacher_id`, `subject_id`, `created_at`, 
 (8, 4, 10, '2025-11-10 14:45:30', '2025-11-10 14:45:30'),
 (9, 4, 11, '2025-11-10 14:45:30', '2025-11-10 14:45:30'),
 (10, 5, 16, '2025-11-10 22:42:38', '2025-11-10 22:42:38'),
-(11, 5, 23, '2025-11-10 22:42:38', '2025-11-10 22:42:38');
+(11, 5, 23, '2025-11-10 22:42:38', '2025-11-10 22:42:38'),
+(12, 5, 6, '2025-11-13 21:28:39', '2025-11-13 21:28:39');
 
 -- --------------------------------------------------------
 
@@ -725,7 +732,10 @@ INSERT INTO `teacher_subject_sections` (`id`, `teacher_subject_id`, `section_id`
 (41, 10, 2, '2025-11-10 22:42:38', '2025-11-10 22:42:38'),
 (42, 11, 3, '2025-11-10 22:42:38', '2025-11-10 22:42:38'),
 (43, 11, 4, '2025-11-10 22:42:38', '2025-11-10 22:42:38'),
-(44, 11, 5, '2025-11-10 22:42:38', '2025-11-10 22:42:38');
+(44, 11, 5, '2025-11-10 22:42:38', '2025-11-10 22:42:38'),
+(45, 12, 4, '2025-11-13 21:28:39', '2025-11-13 21:28:39'),
+(46, 12, 5, '2025-11-13 21:28:39', '2025-11-13 21:28:39'),
+(47, 12, 6, '2025-11-13 21:28:39', '2025-11-13 21:28:39');
 
 -- --------------------------------------------------------
 
@@ -735,13 +745,13 @@ INSERT INTO `teacher_subject_sections` (`id`, `teacher_subject_id`, `section_id`
 
 CREATE TABLE `users` (
   `id` int UNSIGNED NOT NULL,
-  `email` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `password` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `role` enum('admin','teacher','student') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'student',
-  `first_name` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `last_name` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `phone` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `status` enum('active','inactive') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'active',
+  `email` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `password` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `role` enum('admin','teacher','student') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'student',
+  `first_name` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `last_name` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `phone` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `status` enum('active','inactive') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'active',
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -752,8 +762,8 @@ CREATE TABLE `users` (
 
 INSERT INTO `users` (`id`, `email`, `password`, `role`, `first_name`, `last_name`, `phone`, `status`, `created_at`, `updated_at`) VALUES
 (1, 'student@demo.com', '$2y$10$Ll4dzxFoqlaGCC1aL702BOdZ3xtLLijHcLKzW4SF1HPrlEgP9Frz6', 'student', 'Demo', 'Student', '', 'active', '2025-11-06 11:13:56', '2025-11-10 01:05:04'),
-(2, 'teacher@demo.com', '$2y$10$/zuE1Q4AmA1J6MXuovoRoenUL5PoblPSzSxXA3ubUw47wpiTNfoVS', 'teacher', 'Demo', 'Teacher', '', 'active', '2025-11-06 11:14:42', '2025-11-10 01:59:57'),
-(3, 'admin@demo.com', '$2y$10$zhZ636k.0buTfPYR..Q2eODPgdmjEcKklTOWC1HTR64BH13j0iNeS', 'admin', 'Demo', 'Admin', '', 'active', '2025-11-06 11:15:04', '2025-11-13 12:15:40'),
+(2, 'teacher@demo.com', '$2y$10$/zuE1Q4AmA1J6MXuovoRoenUL5PoblPSzSxXA3ubUw47wpiTNfoVS', 'teacher', 'Demo', 'Teacher', '', 'active', '2025-11-06 11:14:42', '2025-11-13 21:40:41'),
+(3, 'admin@demo.com', '$2y$10$zhZ636k.0buTfPYR..Q2eODPgdmjEcKklTOWC1HTR64BH13j0iNeS', 'admin', 'Demo', 'Admin', '', 'active', '2025-11-06 11:15:04', '2025-11-14 08:53:35'),
 (16, 'john.doe@example.com', '$2y$10$I19hzyUWwzkG9HMk8wEutekUr7tC9GmtiRFvW4lqePlq4eKBKXQtS', 'teacher', 'John', 'Doe', '', 'active', '2025-11-06 14:05:34', '2025-11-06 18:29:13'),
 (18, 'juan.delacruz@mcc.edu.ph', '$2y$10$762nxMWoGHGu7kRyvzc8K.FGrrYGGJpRdMbm5jentTkF4mfui3iBK', 'student', 'Juan', 'Dela Cruz', '', 'active', '2025-11-06 18:30:24', '2025-11-06 18:30:24'),
 (19, 'maria.santos@mcc.edu.ph', '$2y$10$KGlfA0PiOWB4HR0pds9.1epVHMzpgv3hsk.qLKXZCSh9mgaD20FCW', 'student', 'Maria', 'Santos', '', 'active', '2025-11-06 18:30:45', '2025-11-06 11:48:51'),
@@ -787,7 +797,7 @@ INSERT INTO `users` (`id`, `email`, `password`, `role`, `first_name`, `last_name
 (49, 'jake.silva@mcc.edu.ph', '$2y$10$KkoQ0Kd5xJgW5f653dpUiOcCyZbZYuZwMRKxzW9Mhq05np6P25mvu', 'student', 'Jake Anthony', 'Silva', '', 'active', '2025-11-10 08:47:32', '2025-11-10 08:47:32'),
 (50, 'kaye.castro@mcc.edu.ph', '$2y$10$E5sxDNYuS7PQPqFEdcdqcupccfatEk39MJsK7LNx0ujWmpNwocPWy', 'student', 'Kaye', 'Castro', '', 'active', '2025-11-10 08:47:40', '2025-11-10 08:47:40'),
 (51, 'leandro.morales@mcc.edu.ph', '$2y$10$icTlD1gFj.SReFcPhM./bec13jp9ru0KFZlfEChhE4zpue7Mzz4CW', 'student', 'Leandro', 'Morales', '', 'active', '2025-11-10 09:21:56', '2025-11-10 09:21:56'),
-(52, 'mia.dizon@mcc.edu.ph', '$2y$10$EtWI1tGPBY9GmYYBuVs1lOSVTSe7XTi4fli2mEDeXH4xrTTo8lQ/e', 'teacher', 'Mia Rose', 'Dizon', '', 'active', '2025-11-10 09:38:20', '2025-11-10 22:44:34'),
+(52, 'mia.dizon@mcc.edu.ph', '$2y$10$EtWI1tGPBY9GmYYBuVs1lOSVTSe7XTi4fli2mEDeXH4xrTTo8lQ/e', 'teacher', 'Mia Rose', 'Dizon', '', 'active', '2025-11-10 09:38:20', '2025-11-14 12:52:00'),
 (53, 'nico.perez@mcc.edu.ph', '$2y$10$m.hi3cAvdrAUzCF7TMoaseMCqY.oGHNorWf7U4e1.IXkR7ANud61S', 'student', 'Nico Allan', 'Perez', '', 'active', '2025-11-10 09:46:50', '2025-11-10 09:46:50'),
 (54, 'olivia.delgado@mcc.edu.ph', '$2y$10$0h4mahiMCDm96OWctcRdXeujn7Yr/PRJvgyO7KQtO954d7V39.26m', 'student', 'Olivia Anne', 'Delgado', NULL, 'active', '2025-11-10 12:04:08', '2025-11-10 19:04:08'),
 (55, 'paul.uy@mcc.edu.ph', '$2y$10$8IsNfV4is0Sgs0N6e70Zk.PP.DcSJswNe.GBdLa3aLZhDxvJ.KiZG', 'student', 'Paul Vincent', 'Uy', NULL, 'active', '2025-11-10 12:04:08', '2025-11-10 19:04:08'),
@@ -1118,9 +1128,13 @@ INSERT INTO `users` (`id`, `email`, `password`, `role`, `first_name`, `last_name
 (379, 'nina.tan@mcc.edu.ph', '$2y$10$PF7SvRWH5j0POPZ0a5U.5OZhNJtKJR2QfrQKCUgn9dBHN9t37aaRu', 'student', 'Nina', 'Tan', NULL, 'active', '2025-11-10 12:30:54', '2025-11-10 19:30:54'),
 (380, 'lily.quinto@mcc.edu.ph', '$2y$10$A3YCPmKUEkKwcoKrMLXj/u2Ne7VWte/IF4MIKUlhfFK3oX8FsDkA6', 'student', 'Lily', 'Quinto', NULL, 'active', '2025-11-10 12:30:54', '2025-11-10 19:30:54'),
 (381, 'sofia.garcia@mcc.edu.ph', '$2y$10$qUlzEY5fNgrOI616zmet0OnRnKJjb3NFjQuGfBnVby.jtOPwLTipG', 'student', 'Sofia', 'Garcia', NULL, 'active', '2025-11-10 12:30:54', '2025-11-10 19:30:54'),
-(382, 'quinn.garcia@mcc.edu.ph', '$2y$10$.enIC7rOQI7guq8c1o2br.hB9QpuKFylpDvpQF1eNvOzgQ9RknVJC', 'teacher', 'Garcia', 'Quinn', '', 'active', '2025-11-11 05:42:14', '2025-11-11 05:42:14'),
+(382, 'quinn.garcia@mcc.edu.ph', '$2y$10$.enIC7rOQI7guq8c1o2br.hB9QpuKFylpDvpQF1eNvOzgQ9RknVJC', 'teacher', 'Garcia', 'Quinn', '', 'active', '2025-11-11 05:42:14', '2025-11-13 23:15:17'),
 (398, 'jeizi.zamora@gmail.com', '$2y$10$HFVy9f7i7ar5qM.VNvNgSOxYEST5JzbOJ6wdTW9nnIHpX1SACAB0q', 'student', 'JOHN', 'ZAMORA', '', 'active', '2025-11-13 17:28:17', '2025-11-13 12:12:49'),
-(405, 'iamchris.japan@gmail.com', '$2y$10$rVAv6OZyR5rs2wofK..GXOudFji4TpDuQ0ZoCjjWsvq89OVm3MaGm', 'student', 'JC', 'Zamora', '', 'active', '2025-11-13 19:16:01', '2025-11-13 19:16:01');
+(405, 'iamchris.japan@gmail.com', '$2y$10$rVAv6OZyR5rs2wofK..GXOudFji4TpDuQ0ZoCjjWsvq89OVm3MaGm', 'student', 'JC', 'Zamora', '', 'active', '2025-11-13 19:16:01', '2025-11-13 19:16:01'),
+(406, 'nikaldabasoriano@gmail.com', '$2y$10$CwnC5Y/tmvrYRUVDE/7MiOIDBUQAZNGEgGOdF6oDGBci5Qd3x5kne', 'student', 'Nik', 'Soriano', '', 'active', '2025-11-14 04:27:38', '2025-11-13 21:35:31'),
+(407, 'roy.morante@mcc.edu.ph', '$2y$10$lPtl3G8NMwrTxWUEUNMRtuea8RtGO7cxepuEK2jpHitFP7wNjyd4q', 'student', 'Roy', 'Morante', NULL, 'active', '2025-11-13 21:29:55', '2025-11-14 04:29:55'),
+(408, 'jarib.sioco@mcc.edu.ph', '$2y$10$wpC01L3Cs10JDc.5Jirczu6946nA5hGgsGpYfC23ldHDLOp7q1366', 'student', 'Jarib', 'Sioco', NULL, 'active', '2025-11-13 21:29:55', '2025-11-14 04:29:55'),
+(409, 'grace.manalo@mcc.edu.ph', '$2y$10$1HCIXSo9VNr1r28gRyAQXuU4c29hwCwv1oNIkHs2.gneCz0rysyfS', 'student', 'Grace Melody', 'Manalo', NULL, 'active', '2025-11-13 21:29:55', '2025-11-14 04:29:55');
 
 -- --------------------------------------------------------
 
@@ -1315,19 +1329,19 @@ ALTER TABLE `academic_periods`
 -- AUTO_INCREMENT for table `activities`
 --
 ALTER TABLE `activities`
-  MODIFY `id` bigint UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
+  MODIFY `id` bigint UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=26;
 
 --
 -- AUTO_INCREMENT for table `activity_grades`
 --
 ALTER TABLE `activity_grades`
-  MODIFY `id` bigint UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=26;
+  MODIFY `id` bigint UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=39;
 
 --
 -- AUTO_INCREMENT for table `password_resets`
 --
 ALTER TABLE `password_resets`
-  MODIFY `id` int UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=20;
+  MODIFY `id` int UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=22;
 
 --
 -- AUTO_INCREMENT for table `sections`
@@ -1339,7 +1353,7 @@ ALTER TABLE `sections`
 -- AUTO_INCREMENT for table `students`
 --
 ALTER TABLE `students`
-  MODIFY `id` int UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=387;
+  MODIFY `id` int UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=391;
 
 --
 -- AUTO_INCREMENT for table `student_subjects`
@@ -1363,19 +1377,19 @@ ALTER TABLE `teachers`
 -- AUTO_INCREMENT for table `teacher_subjects`
 --
 ALTER TABLE `teacher_subjects`
-  MODIFY `id` int UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=12;
+  MODIFY `id` int UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=13;
 
 --
 -- AUTO_INCREMENT for table `teacher_subject_sections`
 --
 ALTER TABLE `teacher_subject_sections`
-  MODIFY `id` int UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=45;
+  MODIFY `id` int UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=48;
 
 --
 -- AUTO_INCREMENT for table `users`
 --
 ALTER TABLE `users`
-  MODIFY `id` int UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=406;
+  MODIFY `id` int UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=410;
 
 --
 -- AUTO_INCREMENT for table `year_levels`
@@ -1386,6 +1400,12 @@ ALTER TABLE `year_levels`
 --
 -- Constraints for dumped tables
 --
+
+--
+-- Constraints for table `activity_grades`
+--
+ALTER TABLE `activity_grades`
+  ADD CONSTRAINT `fk_activity_grades_activity_id` FOREIGN KEY (`activity_id`) REFERENCES `activities` (`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
 -- Constraints for table `students`

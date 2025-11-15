@@ -78,6 +78,9 @@ class StudentController extends Controller
             if (!empty($_GET['search'])) {
                 $filters['search'] = $_GET['search'];
             }
+            if (!empty($_GET['include_grades'])) {
+                $filters['include_grades'] = $_GET['include_grades'];
+            }
 
             $students = $this->StudentModel->get_all($filters);
 

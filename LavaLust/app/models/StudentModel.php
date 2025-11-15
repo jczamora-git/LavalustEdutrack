@@ -44,7 +44,26 @@ class StudentModel extends Model
             $query = $query->where_group_end();
         }
 
-    return $query->order_by('students.created_at', 'DESC')->get_all();
+        $students = $query->order_by('students.created_at', 'DESC')->get_all();
+        
+        // If include_grades is requested, fetch grades for each student
+        if (!empty($filters['include_grades']) && is_array($students)) {
+            foreach ($students as &$student) {
+                $student['grades'] = $this->get_student_grades($student['id']);
+            }
+        }
+        
+        return $students;
+    }
+    
+    /**
+     * Get all grades for a specific student
+     */
+    public function get_student_grades($studentId)
+    {
+        return $this->db->table('activity_grades')
+                        ->where('student_id', $studentId)
+                        ->get_all();
     }
 
     /**

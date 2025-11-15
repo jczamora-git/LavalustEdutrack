@@ -41,6 +41,9 @@ class ActivityController extends Controller
             if (!empty($_GET['type'])) {
                 $filters['type'] = $_GET['type'];
             }
+            if (!empty($_GET['grading_period'])) {
+                $filters['grading_period'] = $_GET['grading_period'];
+            }
             if (!empty($_GET['status'])) {
                 $filters['status'] = $_GET['status'];
             }
@@ -166,6 +169,7 @@ class ActivityController extends Controller
                 'course_id' => $data['course_id'],
                 'title' => $data['title'],
                 'type' => $data['type'],
+                'grading_period' => $data['grading_period'] ?? 'midterm',
                 'max_score' => $data['max_score'] ?? 100,
                 'due_at' => $data['due_at'] ?? null,
                 'section_id' => $data['section_id'] ?? null,
@@ -241,6 +245,7 @@ class ActivityController extends Controller
             // Only allow certain fields to be updated
             if (!empty($data['title'])) $updateData['title'] = $data['title'];
             if (!empty($data['type'])) $updateData['type'] = $data['type'];
+            if (!empty($data['grading_period'])) $updateData['grading_period'] = $data['grading_period'];
             if (isset($data['max_score'])) $updateData['max_score'] = $data['max_score'];
             if (isset($data['due_at'])) $updateData['due_at'] = $data['due_at'];
 
