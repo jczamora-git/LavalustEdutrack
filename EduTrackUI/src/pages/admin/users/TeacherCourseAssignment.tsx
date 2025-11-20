@@ -126,8 +126,61 @@ const TeacherCourseAssignment = () => {
 
   const fetchSubjects = async () => {
     try {
-      const res = await apiGet(API_ENDPOINTS.SUBJECTS);
-      const rows = (res && res.subjects) || (Array.isArray(res) ? res : res && res.rows ? res.rows : []);
+      // Try to fetch current active academic period so we can limit subjects
+      let semesterParam: string | null = null;
+      try {
+        const ap = await apiGet(API_ENDPOINTS.ACADEMIC_PERIODS_ACTIVE);
+        const active = ap && (ap.active || ap.period || ap.academic_period || ap);
+        if (active && active.semester) {
+          const m = String(active.semester).match(/^(\d+)/);
+          semesterParam = m ? (String(m[1]) === '1' ? '1st' : '2nd') : String(active.semester);
+        }
+      } catch (err) {
+        console.debug('Failed to fetch active academic period, will fetch subjects without semester filter', err);
+      }
+
+      // First attempt: request subjects filtered by semester (server-side filtering)
+      let res: any = null;
+      if (semesterParam) {
+        res = await apiGet(`${API_ENDPOINTS.SUBJECTS}?semester=${encodeURIComponent(semesterParam)}`);
+      } else {
+        res = await apiGet(API_ENDPOINTS.SUBJECTS);
+      }
+
+      let rows = (res && res.subjects) || (Array.isArray(res) ? res : res && res.rows ? res.rows : []);
+
+      // Fallback: if server-side filtered result is empty but we have a semester, fetch all and filter client-side
+      if ((!rows || rows.length === 0) && semesterParam) {
+        try {
+          const all = await apiGet(API_ENDPOINTS.SUBJECTS);
+          const allRows = (all && all.subjects) || (Array.isArray(all) ? all : all && all.rows ? all.rows : []);
+          if (Array.isArray(allRows)) {
+            rows = allRows.filter((s: any) => {
+              const semRaw = s.semester ?? s.academic_period_semester ?? s.sem ?? s.period ?? '';
+              if (!semRaw) return false;
+              const mm = String(semRaw).match(/^(\d+)/);
+              const semShort = mm ? (String(mm[1]) === '1' ? '1st' : '2nd') : String(semRaw);
+              return semShort === semesterParam;
+            });
+          }
+        } catch (err) {
+          console.debug('Failed to fetch all subjects for client-side semester filter', err);
+        }
+      }
+
+      // If we have an active semester, enforce it client-side too because some
+      // backend implementations ignore the semester query param and return all subjects.
+      if (semesterParam && Array.isArray(rows) && rows.length) {
+        rows = rows.filter((s: any) => {
+          const semRaw = s.semester ?? s.academic_period_semester ?? s.sem ?? s.period ?? s.period_name ?? s.semester_name ?? '';
+          if (!semRaw) return false;
+          const mm = String(semRaw).match(/(\d+)/);
+          const semShort = mm ? (String(mm[1]) === '1' ? '1st' : '2nd') : String(semRaw).replace(/semester/i, '').trim();
+          // Accept if normalized short matches or if the raw includes the semesterParam
+          return semShort === semesterParam || String(semRaw).toLowerCase().includes(String(semesterParam).toLowerCase());
+        });
+      }
+
       if (Array.isArray(rows)) {
         const mapped = rows.map((s: any) => ({
           id: s.id?.toString() || "",

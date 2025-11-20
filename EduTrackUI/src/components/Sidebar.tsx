@@ -120,6 +120,7 @@ export const Sidebar = () => {
   const adminLinks = [
     { to: "/admin/dashboard", icon: BarChart3, label: "Dashboard" },
     { to: "/admin/users", icon: Users, label: "Manage Users" },
+    { to: "/admin/campuses", icon: School, label: "Campuses" },
     { to: "/admin/grading", icon: Award, label: "Grading System" },
     { to: "/admin/announcements", icon: Bell, label: "Announcements" },
     { to: "/admin/payments", icon: CreditCard, label: "Payments" },

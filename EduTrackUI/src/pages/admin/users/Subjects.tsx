@@ -157,8 +157,7 @@ const Subjects = () => {
           course_name: form.name.trim(),
           credits: form.credits,
           category: form.category,
-          // template literal is always a string, no nullish fallback needed
-          year_level: `${form.yearLevel}st Year`,
+          year_level: form.yearLevel,
           semester: form.semester === '1st' ? '1st Semester' : '2nd Semester',
           status: form.status,
         };
@@ -217,7 +216,7 @@ const Subjects = () => {
           course_name: form.name.trim(),
           credits: form.credits,
           category: form.category,
-          year_level: `${form.yearLevel}st Year`,
+          year_level: form.yearLevel,
           semester: form.semester === '1st' ? '1st Semester' : '2nd Semester',
           status: form.status,
         };

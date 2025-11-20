@@ -31,6 +31,11 @@ class ActivityModel extends Model
             $query = $query->where('type', $filters['type']);
         }
 
+        // Academic period filter (optional) - filter by specific academic period
+        if (!empty($filters['academic_period_id'])) {
+            $query = $query->where('academic_period_id', $filters['academic_period_id']);
+        }
+
         // Search by title (optional)
         if (!empty($filters['search'])) {
             $search = '%' . $filters['search'] . '%';

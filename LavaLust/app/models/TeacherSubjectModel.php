@@ -211,12 +211,10 @@ class TeacherSubjectModel extends Model
     public function get_all_assignments($subject_codes = null)
     {
         $query = $this->db->table('teacher_subjects ts')
-                       ->select('ts.id as teacher_subject_id, ts.subject_id, ts.teacher_id')
+                       ->select('ts.id as teacher_subject_id, ts.subject_id, ts.teacher_id, s.id as subject_id, s.course_code, s.course_name, s.credits, s.year_level, t.id as teacher_id, u.first_name, u.last_name')
                        ->join('subjects s', 'ts.subject_id = s.id')
                        ->join('teachers t', 'ts.teacher_id = t.id')
-                       ->join('users u', 't.user_id = u.id')
-                       ->select('s.id as subject_id, s.course_code, s.course_name, s.credits, s.year_level')
-                       ->select('t.id as teacher_id, u.first_name, u.last_name');
+                       ->join('users u', 't.user_id = u.id');
 
         // subject_codes can be either a single string or an array of codes
         if (!empty($subject_codes) && is_array($subject_codes) && count($subject_codes) > 0) {

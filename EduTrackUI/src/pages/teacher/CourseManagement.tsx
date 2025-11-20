@@ -19,8 +19,7 @@ const getActivityTypeDisplay = (type: string) => {
   const typeMap: Record<string, { label: string; color: string; bgColor: string; Icon: any }> = {
     assignment: { label: 'Assignment', color: 'text-blue-600', bgColor: 'bg-blue-50 border-blue-200', Icon: FileText },
     quiz: { label: 'Quiz', color: 'text-purple-600', bgColor: 'bg-purple-50 border-purple-200', Icon: HelpCircle },
-    midterm: { label: 'Midterm', color: 'text-orange-600', bgColor: 'bg-orange-50 border-orange-200', Icon: Award },
-    final: { label: 'Final', color: 'text-red-600', bgColor: 'bg-red-50 border-red-200', Icon: Award },
+    exam: { label: 'Exam', color: 'text-red-600', bgColor: 'bg-red-50 border-red-200', Icon: Award },
     project: { label: 'Project', color: 'text-cyan-600', bgColor: 'bg-cyan-50 border-cyan-200', Icon: Zap },
     laboratory: { label: 'Laboratory', color: 'text-green-600', bgColor: 'bg-green-50 border-green-200', Icon: Microscope },
     performance: { label: 'Performance', color: 'text-indigo-600', bgColor: 'bg-indigo-50 border-indigo-200', Icon: BookOpen },
@@ -64,8 +63,7 @@ const CourseManagement = () => {
   const activityCategories = [
     'assignment',
     'quiz',
-    'midterm',
-    'final',
+    'exam',
     'project',
     'laboratory',
     'performance',
@@ -408,6 +406,14 @@ const CourseManagement = () => {
               ) : (
                 courseInfo.section && <span className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">{courseInfo.section}</span>
               )}
+              {selectedPeriod && selectedPeriod.status === 'active' && (
+                <div className="ml-auto flex items-center gap-2 bg-gradient-to-r from-blue-50 to-cyan-50 border-2 border-blue-200 px-4 py-2 rounded-full">
+                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                  <span className="text-sm font-bold text-blue-900">
+                    {selectedPeriod.school_year} - {selectedPeriod.semester} ({selectedPeriod.period_type})
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -473,6 +479,14 @@ const CourseManagement = () => {
                           <div>
                             <h3 className="text-2xl font-bold">Create New Activity</h3>
                             <p className="text-sm font-medium opacity-95 mt-2">Create a new activity for this course.</p>
+                            {selectedPeriod && selectedPeriod.status === 'active' && (
+                              <div className="mt-3 bg-white/20 backdrop-blur-sm rounded-lg px-3 py-2 border border-white/30">
+                                <p className="text-xs font-semibold opacity-90">Academic Period:</p>
+                                <p className="text-sm font-bold">
+                                  {selectedPeriod.school_year} - {selectedPeriod.semester} ({selectedPeriod.period_type})
+                                </p>
+                              </div>
+                            )}
                           </div>
                         </div>
                         <div className="px-8 py-6 bg-white space-y-6">
@@ -489,8 +503,7 @@ const CourseManagement = () => {
                                <SelectContent>
                                   <SelectItem value="assignment">Assignment</SelectItem>
                                   <SelectItem value="quiz">Quiz</SelectItem>
-                                  <SelectItem value="midterm">Midterm</SelectItem>
-                                  <SelectItem value="final">Final</SelectItem>
+                                  <SelectItem value="exam">Exam</SelectItem>
                                   <SelectItem value="project">Project</SelectItem>
                                   <SelectItem value="laboratory">Laboratory</SelectItem>
                                   <SelectItem value="performance">Performance</SelectItem>
@@ -527,6 +540,13 @@ const CourseManagement = () => {
                                 setAlert({ type: 'error', message: 'Please select a due date for the activity' });
                                 return;
                               }
+                              
+                              // Check if there's an active academic period
+                              if (!selectedPeriod || selectedPeriod.status !== 'active') {
+                                setAlert({ type: 'error', message: 'No active academic period found. Please contact administrator.' });
+                                return;
+                              }
+
                               try {
                                 const res = await apiPost(API_ENDPOINTS.ACTIVITIES, {
                                   course_id: courseId,
@@ -535,6 +555,7 @@ const CourseManagement = () => {
                                   type: newType,
                                   max_score: Number(newMaxScore) || 100,
                                   due_at: newDueDate || null,
+                                  academic_period_id: selectedPeriod.id, // Link to active academic period
                                 });
 
                                 if (res.success && res.data) {
@@ -548,7 +569,7 @@ const CourseManagement = () => {
                                   setNewMaxScore("");
                                   setNewDueDate("");
                                   setIsAddOpen(false);
-                                  setAlert({ type: 'success', message: 'Activity created successfully!' });
+                                  setAlert({ type: 'success', message: `Activity created for ${selectedPeriod.school_year} ${selectedPeriod.semester} - ${selectedPeriod.period_type}` });
                                 } else {
                                   setAlert({ type: 'error', message: 'Failed to create activity: ' + (res.message || 'Unknown error') });
                                 }

@@ -77,6 +77,8 @@ $router->get('/api/teachers', 'TeacherController::api_get_teachers');
 $router->get('/api/teachers/stats', 'TeacherController::api_teacher_stats');
 $router->get('/api/teachers/last-id', 'TeacherController::api_get_last_id');
 $router->get('/api/teachers/{id}', 'TeacherController::api_get_teacher')->where_number('id');
+// Public/student-accessible teacher info
+$router->get('/api/teachers/{id}/public', 'TeacherController::api_get_public_teacher')->where_number('id');
 $router->post('/api/teachers', 'TeacherController::api_create_teacher');
 $router->put('/api/teachers/{id}', 'TeacherController::api_update_teacher')->where_number('id');
 $router->delete('/api/teachers/{id}', 'TeacherController::api_delete_teacher')->where_number('id');
@@ -122,6 +124,9 @@ $router->post('/api/subjects', 'SubjectController::api_create_subject');
 $router->put('/api/subjects/{id}', 'SubjectController::api_update_subject')->where_number('id');
 $router->delete('/api/subjects/{id}', 'SubjectController::api_delete_subject')->where_number('id');
 
+// API Routes - Subjects (Student accessible)
+$router->get('/api/subjects/for-student', 'SubjectController::api_get_for_student');
+
 // API Routes - Teacher Assignments (Admin only)
 $router->post('/api/teacher-assignments', 'TeacherAssignmentController::api_assign_subjects');
 $router->get('/api/teacher-assignments/my', 'TeacherAssignmentController::api_get_mine');
@@ -132,6 +137,9 @@ $router->post('/api/teacher-assignments/remove-section', 'TeacherAssignmentContr
 // Remove an entire teacher_subject assignment
 $router->post('/api/teacher-assignments/remove-assignment', 'TeacherAssignmentController::api_remove_assignment');
 
+// API Routes - Teacher Assignments (Student accessible)
+$router->get('/api/teacher-assignments/for-student', 'TeacherAssignmentController::api_get_for_student');
+
 // API Routes - Student Subjects (Enrollments)
 $router->get('/api/student-subjects', 'StudentSubjectController::api_get');
 $router->post('/api/student-subjects', 'StudentSubjectController::api_create');
@@ -139,9 +147,33 @@ $router->post('/api/student-subjects/delete', 'StudentSubjectController::api_del
 
 // API Routes - Activities (Grade Transparency)
 $router->get('/api/activities', 'ActivityController::api_get_activities');
+$router->get('/api/activities/student-grades', 'ActivityController::api_get_student_activities_with_grades');
+$router->get('/api/activities/student-all', 'ActivityController::api_get_all_student_activities_with_grades');
+$router->get('/api/activities/export-class-record', 'ActivityController::api_export_class_record');
+$router->get('/api/activities/export-class-record-excel', 'ActivityController::api_export_class_record_excel');
 $router->get('/api/activities/{id}', 'ActivityController::api_get_activity')->where_number('id');
 $router->post('/api/activities', 'ActivityController::api_create_activity');
 $router->put('/api/activities/{id}', 'ActivityController::api_update_activity')->where_number('id');
 $router->delete('/api/activities/{id}', 'ActivityController::api_delete_activity')->where_number('id');
 $router->get('/api/activities/{id}/grades', 'ActivityController::api_get_activity_grades')->where_number('id');
 $router->post('/api/activities/{id}/grades', 'ActivityController::api_set_grade')->where_number('id');
+
+// API Routes - Academic Periods
+$router->get('/api/academic-periods', 'AcademicPeriodController::api_get_periods');
+$router->get('/api/academic-periods/stats', 'AcademicPeriodController::api_get_stats');
+$router->get('/api/academic-periods/active', 'AcademicPeriodController::api_get_active');
+$router->get('/api/academic-periods/active-public', 'AcademicPeriodController::api_get_active_public');
+$router->get('/api/academic-periods/grading-context', 'AcademicPeriodController::api_get_grading_context');
+$router->get('/api/academic-periods/current-subjects', 'AcademicPeriodController::api_get_current_subjects');
+$router->get('/api/academic-periods/{id}', 'AcademicPeriodController::api_get_period')->where_number('id');
+$router->post('/api/academic-periods', 'AcademicPeriodController::api_create_period');
+$router->put('/api/academic-periods/{id}', 'AcademicPeriodController::api_update_period')->where_number('id');
+$router->post('/api/academic-periods/{id}/set-active', 'AcademicPeriodController::api_set_active')->where_number('id');
+$router->delete('/api/academic-periods/{id}', 'AcademicPeriodController::api_delete_period')->where_number('id');
+
+// API Routes - Campuses (Admin)
+$router->get('/api/campuses', 'CampusController::api_get_campuses');
+$router->get('/api/campuses/{id}', 'CampusController::api_get_campus')->where_number('id');
+$router->post('/api/campuses', 'CampusController::api_create_campus');
+$router->put('/api/campuses/{id}', 'CampusController::api_update_campus')->where_number('id');
+$router->delete('/api/campuses/{id}', 'CampusController::api_delete_campus')->where_number('id');

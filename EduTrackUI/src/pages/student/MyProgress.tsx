@@ -1,10 +1,12 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Calendar, TrendingUp, CheckCircle, Clock } from "lucide-react";
+import { API_ENDPOINTS, apiGet } from "@/lib/api";
+import { Loader2 } from "lucide-react";
 
 const MyProgress = () => {
   const { user, isAuthenticated } = useAuth();
@@ -16,11 +18,78 @@ const MyProgress = () => {
     }
   }, [isAuthenticated, user, navigate]);
 
-  const progress = [
-    { course: "Mathematics 101", completed: 18, total: 24, percentage: 75, trend: "+5%" },
-    { course: "Science 101", completed: 20, total: 24, percentage: 83, trend: "+8%" },
-    { course: "English Literature", completed: 16, total: 24, percentage: 67, trend: "+3%" },
-  ];
+  const [progress, setProgress] = useState<any[]>([]);
+  const [attendance, setAttendance] = useState<{ present: number; total: number }>({ present: 0, total: 45 });
+  const [submissionRate, setSubmissionRate] = useState<{ onTime: number; total: number }>({ onTime: 0, total: 0 });
+  const [loadingProgress, setLoadingProgress] = useState(true);
+
+  useEffect(() => {
+    const loadProgress = async () => {
+      if (!user?.id) return;
+      setLoadingProgress(true);
+
+      try {
+        // Fetch student and then bulk activities with grades
+        const studentRes = await apiGet(API_ENDPOINTS.STUDENT_BY_USER(user.id));
+        const student = studentRes.data || studentRes.student || studentRes || null;
+        if (!student || !student.id) {
+          setProgress([]);
+          setLoadingProgress(false);
+          return;
+        }
+
+        const actsRes = await apiGet(`${API_ENDPOINTS.ACTIVITIES_STUDENT_ALL}?student_id=${student.id}`);
+        const acts = actsRes.data || [];
+
+        // Group activities by course_name
+        const byCourse: Record<string, any[]> = {};
+        for (const a of acts) {
+          const course = a.course_name || a.course || 'Unassigned';
+          if (!byCourse[course]) byCourse[course] = [];
+          byCourse[course].push(a);
+        }
+
+        const progressArr = Object.entries(byCourse).map(([course, arr]) => {
+          const total = arr.length;
+          const completed = arr.filter(x => x.student_grade !== null && x.student_grade !== undefined).length;
+          const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
+          return { course, completed, total, percentage, trend: '' };
+        });
+
+        // Submission rate: count grade records and on-time submissions
+        let totalSubmissions = 0;
+        let onTime = 0;
+        for (const a of acts) {
+          if (a.grade_id) {
+            totalSubmissions += 1;
+            // compare grade_created_at to due_at when available
+            if (a.grade_created_at && a.due_at) {
+              const gradeAt = new Date(a.grade_created_at).getTime();
+              const dueAt = new Date(a.due_at).getTime();
+              if (!isNaN(gradeAt) && !isNaN(dueAt) && gradeAt <= dueAt) onTime += 1;
+            }
+          }
+        }
+
+        // Attendance approximation: scale completion to 45 days (fallback when no attendance API)
+        const totalActivities = acts.length;
+        const totalCompleted = acts.filter(x => x.student_grade !== null && x.student_grade !== undefined).length;
+        const daysTotal = 45;
+        const daysPresent = totalActivities > 0 ? Math.round((totalCompleted / totalActivities) * daysTotal) : 0;
+
+        setProgress(progressArr);
+        setSubmissionRate({ onTime, total: totalSubmissions });
+        setAttendance({ present: daysPresent, total: daysTotal });
+      } catch (err) {
+        console.warn('Failed to load progress', err);
+        setProgress([]);
+      } finally {
+        setLoadingProgress(false);
+      }
+    };
+
+    if (isAuthenticated && user?.role === 'student') loadProgress();
+  }, [user, isAuthenticated]);
 
   if (!isAuthenticated) return null;
 

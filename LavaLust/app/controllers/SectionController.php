@@ -63,9 +63,10 @@ class SectionController extends Controller
     {
         api_set_json_headers();
 
-        if (!$this->is_admin()) {
+        // Allow any authenticated user to view a single section (students need this)
+        if ($this->session->userdata('logged_in') !== true) {
             http_response_code(403);
-            echo json_encode(['success' => false, 'message' => 'Access denied. Admin only.']);
+            echo json_encode(['success' => false, 'message' => 'Access denied. Login required.']);
             return;
         }
 

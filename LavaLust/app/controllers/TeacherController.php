@@ -142,6 +142,61 @@ class TeacherController extends Controller
     }
 
     /**
+     * GET /api/teachers/{id}/public
+     * Student-accessible: returns basic teacher profile for public/student views
+     */
+    public function api_get_public_teacher($id)
+    {
+         api_set_json_headers();
+
+        if (!$this->session->userdata('logged_in')) {
+            http_response_code(401);
+            echo json_encode([
+                'success' => false,
+                'message' => 'Unauthorized'
+            ]);
+            return;
+        }
+
+        try {
+            $teacher = $this->TeacherModel->find_by_id($id);
+
+            if (!$teacher) {
+                http_response_code(404);
+                echo json_encode([
+                    'success' => false,
+                    'message' => 'Teacher not found'
+                ]);
+                return;
+            }
+
+            // Minimal public profile
+            $public = [
+                'id' => $teacher['id'] ?? null,
+                'first_name' => $teacher['first_name'] ?? null,
+                'last_name' => $teacher['last_name'] ?? null,
+                'email' => $teacher['email'] ?? null,
+                'phone' => $teacher['phone'] ?? null,
+                'employee_id' => $teacher['employee_id'] ?? null,
+            ];
+
+            // Optionally include assigned courses for context (teacher_subjects)
+            $public['assigned_courses'] = $this->TeacherModel->get_assigned_courses($teacher['id']);
+
+            echo json_encode([
+                'success' => true,
+                'teacher' => $public
+            ]);
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode([
+                'success' => false,
+                'message' => 'Server error: ' . $e->getMessage()
+            ]);
+        }
+    }
+
+    /**
      * Create new teacher
      * POST /api/teachers
      * 

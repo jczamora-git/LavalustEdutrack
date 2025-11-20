@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Plus, ClipboardList, Search, List, LayoutGrid } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { API_ENDPOINTS, apiGet } from "@/lib/api";
 
 const Activities = () => {
   const { user, isAuthenticated } = useAuth();
@@ -21,11 +22,70 @@ const Activities = () => {
     }
   }, [isAuthenticated, user, navigate]);
 
-  const activities = [
-    { title: "Programming Assignment 1", course: "CS101", section: "Section A", type: "Assignment", dueDate: "2025-01-25", submissions: 28, totalStudents: 35 },
-    { title: "Midterm Exam", course: "CS201", section: "Section B", type: "Exam", dueDate: "2025-01-22", submissions: 28, totalStudents: 28 },
-    { title: "Research Paper", course: "CS301", section: "Section A", type: "Project", dueDate: "2025-01-20", submissions: 25, totalStudents: 30 },
-  ];
+  const [activities, setActivities] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch real activities data
+  useEffect(() => {
+    const fetchActivities = async () => {
+      try {
+        setLoading(true);
+        
+        // 1. Get teacher's assigned courses
+        const coursesRes = await apiGet(`${API_ENDPOINTS.TEACHER_ASSIGNMENTS}/my`);
+        const myCourses = coursesRes.assigned_courses || coursesRes.assignments || coursesRes.data || [];
+        
+        // Create lookup maps
+        const courseMap: Map<any, any> = new Map(
+          myCourses.map((c: any) => [
+            c.id || c.teacher_subject_id || c.subject_id,
+            {
+              code: c.course_code || c.code || 'N/A',
+              name: c.course_name || c.title || 'N/A',
+              section: c.section_name || 'N/A'
+            }
+          ])
+        );
+
+        // 2. Fetch all activities
+        const activitiesRes = await apiGet(API_ENDPOINTS.ACTIVITIES);
+        const allActivities = activitiesRes.data || activitiesRes.activities || activitiesRes || [];
+
+        // 3. Filter activities for teacher's courses and enrich with course info
+        const myActivities = allActivities
+          .filter((a: any) => {
+            const courseId = a.course_id || a.teacher_subject_id || a.subject_id;
+            return courseMap.has(courseId);
+          })
+          .map((a: any) => {
+            const courseId = a.course_id || a.teacher_subject_id || a.subject_id;
+            const courseInfo = courseMap.get(courseId) || { code: 'N/A', name: 'N/A', section: 'N/A' };
+            
+            return {
+              id: a.id,
+              title: a.title || a.name || 'Untitled',
+              course: courseInfo.code,
+              section: courseInfo.section,
+              type: a.type || 'Assignment',
+              dueDate: a.due_at ? new Date(a.due_at).toISOString().split('T')[0] : 'No due date',
+              submissions: a.graded_count || 0,
+              totalStudents: a.total_students || 0
+            };
+          });
+
+        setActivities(myActivities);
+      } catch (error) {
+        console.error('Failed to fetch activities:', error);
+        setActivities([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (isAuthenticated && user?.role === "teacher") {
+      fetchActivities();
+    }
+  }, [isAuthenticated, user]);
 
   const [subjectFilter, setSubjectFilter] = useState<string>("all");
   const [sectionFilter, setSectionFilter] = useState<string>("all");
@@ -65,7 +125,9 @@ const Activities = () => {
       <div className="p-8">
         <div className="mb-6">
           <h1 className="text-3xl font-bold mb-2">Activities</h1>
-          <p className="text-muted-foreground">View and manage all activities across courses</p>
+          <p className="text-muted-foreground">
+            {loading ? 'Loading activities...' : `View and manage ${activities.length} activities across courses`}
+          </p>
         </div>
 
         <Card>
@@ -151,7 +213,16 @@ const Activities = () => {
 
             {/* Activities Content */}
             <div className="p-4">
-              {viewMode === "list" ? (
+              {loading ? (
+                <div className="text-center py-12">
+                  <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent align-[-0.125em] motion-reduce:animate-[spin_1.5s_linear_infinite]" />
+                  <p className="text-muted-foreground mt-4">Loading activities...</p>
+                </div>
+              ) : displayed.length === 0 ? (
+                <div className="text-center py-12">
+                  <p className="text-muted-foreground">No activities found</p>
+                </div>
+              ) : viewMode === "list" ? (
                 <div className="space-y-3">
                   {displayed.map((activity, index) => (
                     <div
@@ -204,12 +275,6 @@ const Activities = () => {
                       <Button size="sm" variant="outline" onClick={() => navigate(`/teacher/courses/${activity.course}/activities/${index}`)} className="w-full">View</Button>
                     </div>
                   ))}
-                </div>
-              )}
-
-              {displayed.length === 0 && (
-                <div className="text-center py-12">
-                  <p className="text-muted-foreground">No activities found</p>
                 </div>
               )}
             </div>

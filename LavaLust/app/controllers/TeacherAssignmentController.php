@@ -433,4 +433,73 @@ class TeacherAssignmentController extends Controller
             echo json_encode(['success' => false, 'message' => 'Server error: ' . $e->getMessage()]);
         }
     }
+
+    /**
+     * GET /api/teacher-assignments/for-student
+     * Student-accessible endpoint: returns teacher assignments for a given section and optional subject
+     * Query params: section_id (required), subject_id (optional)
+     */
+    public function api_get_for_student()
+    {
+        api_set_json_headers();
+
+        if (!$this->session->userdata('logged_in')) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Not authenticated']);
+            return;
+        }
+
+        try {
+            $section_id = $_GET['section_id'] ?? null;
+            $subject_id = $_GET['subject_id'] ?? null;
+
+            if (empty($section_id)) {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'message' => 'section_id is required']);
+                return;
+            }
+
+            // Fetch all assignments and filter by section_id and optional subject_id
+            $all_assignments = $this->TeacherSubjectModel->get_all_assignments(null);
+            $filtered = [];
+
+            foreach ($all_assignments as $a) {
+                $sections = $a['sections'] ?? [];
+                $matches_section = false;
+
+                // Check if section_id matches
+                foreach ($sections as $s) {
+                    $sid = null;
+                    if (is_array($s) && isset($s['id'])) {
+                        $sid = $s['id'];
+                    } elseif (is_array($s) && isset($s['section_id'])) {
+                        $sid = $s['section_id'];
+                    }
+
+                    if ($sid && (int)$sid === (int)$section_id) {
+                        $matches_section = true;
+                        break;
+                    }
+                }
+
+                if (!$matches_section) continue;
+
+                // Optional: filter by subject_id
+                if (!empty($subject_id)) {
+                    $a_subject_id = $a['subject_id'] ?? ($a['subject']['id'] ?? null);
+                    if ($a_subject_id && (int)$a_subject_id !== (int)$subject_id) {
+                        continue;
+                    }
+                }
+
+                $filtered[] = $a;
+            }
+
+            echo json_encode(['success' => true, 'assignments' => $filtered, 'count' => count($filtered)]);
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'message' => 'Server error: ' . $e->getMessage()]);
+        }
+    }
 }
+

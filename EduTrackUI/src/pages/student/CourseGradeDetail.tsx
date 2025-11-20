@@ -1,18 +1,13 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, BookOpen, CheckCircle, AlertCircle, TrendingUp } from "lucide-react";
-
-interface CourseGrade {
-  course: string;
-  overall: string;
-  grades: Array<{ activity: string; score: string; percentage: number; letter: string }>;
-}
+import { ArrowLeft, BookOpen, CheckCircle, AlertCircle, TrendingUp, Loader2 } from "lucide-react";
+import { API_ENDPOINTS, apiGet } from "@/lib/api";
 
 interface GradeCategory {
   name: string;
@@ -25,9 +20,12 @@ interface GradeCategory {
 const CourseGradeDetail = () => {
   const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
-  const courseData = location.state?.course as CourseGrade | undefined;
+  const { courseId } = useParams<{ courseId: string }>();
   const [currentTerm, setCurrentTerm] = useState<"midterm" | "finalterm">("midterm");
+  const [loading, setLoading] = useState(true);
+  const [courseInfo, setCourseInfo] = useState<any>(null);
+  const [midtermGrades, setMidtermGrades] = useState<GradeCategory[]>([]);
+  const [finaltermGrades, setFinaltermGrades] = useState<GradeCategory[]>([]);
 
   useEffect(() => {
     if (!isAuthenticated || user?.role !== "student") {
@@ -35,101 +33,200 @@ const CourseGradeDetail = () => {
     }
   }, [isAuthenticated, user, navigate]);
 
-  // Mock grade data for Midterm
-  const midtermGrades: GradeCategory[] = [
-    {
-      name: "Written Works",
-      weight: 30,
-      score: 260,
-      maxScore: 300,
-      percentage: 86.67
-    },
-    {
-      name: "Performance Tasks",
-      weight: 40,
-      score: 45,
-      maxScore: 100,
-      percentage: 45
-    },
-    {
-      name: "Exam",
-      weight: 30,
-      score: 60,
-      maxScore: 100,
-      percentage: 60
+  // OPTIMIZED: Fetch grade category data for a specific course and academic period
+  const fetchGradesForPeriod = async (periodType: 'Midterm' | 'Final Term', allActivities: any[], sectionId: number, studentId: number): Promise<GradeCategory[]> => {
+    try {
+      // Filter activities by period type
+      const periodActivities = allActivities.filter((a: any) => {
+        const actPeriodType = a.period_type || a.academic_period?.period_type;
+        return actPeriodType === periodType;
+      });
+
+      // Categorize activities (matching teacher's GradeInputEdit logic)
+      const writtenWorks = periodActivities.filter((a: any) => {
+        const type = (a.type || '').toLowerCase();
+        return ['quiz', 'assignment', 'other'].includes(type);
+      });
+      
+      const performanceTasks = periodActivities.filter((a: any) => {
+        const type = (a.type || '').toLowerCase();
+        return ['project', 'laboratory', 'performance'].includes(type);
+      });
+      
+      const exams = periodActivities.filter((a: any) => {
+        const type = (a.type || '').toLowerCase();
+        return type === 'exam';
+      });
+
+      // OPTIMIZED: Calculate grades from activities that already have student_grade embedded
+      const calculateGradesForActivities = (acts: any[]) => {
+        let totalScore = 0;
+        let totalMaxScore = 0;
+        for (const act of acts) {
+          // Use the embedded student_grade from the optimized endpoint
+          if (act.student_grade !== null && act.student_grade !== undefined) {
+            totalScore += parseFloat(act.student_grade);
+          }
+          totalMaxScore += parseFloat(act.max_score || 0);
+        }
+        return { totalScore, totalMaxScore };
+      };
+
+      const writtenData = calculateGradesForActivities(writtenWorks);
+      const performanceData = calculateGradesForActivities(performanceTasks);
+      const examData = calculateGradesForActivities(exams);
+
+      const categories: GradeCategory[] = [
+        {
+          name: "Written Works",
+          weight: 30,
+          score: writtenData.totalScore,
+          maxScore: writtenData.totalMaxScore || 1,
+          percentage: writtenData.totalMaxScore > 0 ? (writtenData.totalScore / writtenData.totalMaxScore) * 100 : 0
+        },
+        {
+          name: "Performance Tasks",
+          weight: 40,
+          score: performanceData.totalScore,
+          maxScore: performanceData.totalMaxScore || 1,
+          percentage: performanceData.totalMaxScore > 0 ? (performanceData.totalScore / performanceData.totalMaxScore) * 100 : 0
+        },
+        {
+          name: "Exam",
+          weight: 30,
+          score: examData.totalScore,
+          maxScore: examData.totalMaxScore || 1,
+          percentage: examData.totalMaxScore > 0 ? (examData.totalScore / examData.totalMaxScore) * 100 : 0
+        }
+      ];
+
+      return categories;
+    } catch (error) {
+      console.error("Error fetching grades for period:", error);
+      return [];
     }
-  ];
+  };
 
-  // Mock grade data for Final Term
-  const finaltermGrades: GradeCategory[] = [
-    {
-      name: "Written Works",
-      weight: 30,
-      score: 280,
-      maxScore: 300,
-      percentage: 93.33
-    },
-    {
-      name: "Performance Tasks",
-      weight: 40,
-      score: 85,
-      maxScore: 100,
-      percentage: 85
-    },
-    {
-      name: "Exam",
-      weight: 30,
-      score: 82,
-      maxScore: 100,
-      percentage: 82
-    }
-  ];
+  // Main data fetch
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!user?.id || !courseId) return;
+      setLoading(true);
 
-  const gradeBreakdown = currentTerm === "midterm" ? midtermGrades : finaltermGrades;
+      try {
+        // 1) Get student to find section_id
+        const studentRes = await apiGet(API_ENDPOINTS.STUDENT_BY_USER(user.id));
+        const student = studentRes.data || studentRes.student || studentRes || null;
+        if (!student?.id) {
+          console.error("Student not found");
+          setLoading(false);
+          return;
+        }
+        const sectionId = student?.section_id ?? student?.sectionId ?? null;
 
-  // Calculate weighted score
-  const calculateWeightedScore = () => {
+        // 2) Get all academic periods
+        const periodsRes = await apiGet(API_ENDPOINTS.ACADEMIC_PERIODS);
+        const periods = Array.isArray(periodsRes) ? periodsRes : (periodsRes.data || []);
+
+        // 3) Get teacher assignments (courses) for this student
+        const assignmentsRes = await apiGet(
+          `${API_ENDPOINTS.TEACHER_ASSIGNMENTS_FOR_STUDENT}?section_id=${sectionId}`
+        );
+        const assignments = Array.isArray(assignmentsRes) ? assignmentsRes : (assignmentsRes.data || assignmentsRes.assignments || []);
+
+        // Find the course we're viewing - courseId could be teacher assignment ID or subject ID
+        let courseAssignment = assignments.find((a: any) => 
+          String(a?.id) === String(courseId) || 
+          String(a?.teacher_subject_id) === String(courseId) ||
+          String(a?.subject_id) === String(courseId)
+        );
+
+        if (!courseAssignment) {
+          console.error("Course assignment not found for this student", courseId, assignments);
+          setLoading(false);
+          return;
+        }
+
+        // Get subject_id (activities.course_id uses subject_id, not teacher_subject_id!)
+        const subjectId = courseAssignment.subject_id || courseAssignment.subject?.id;
+
+        // Get subject details to find course title
+        let subjectRes: any = null;
+        if (subjectId) {
+          subjectRes = await apiGet(API_ENDPOINTS.SUBJECT_BY_ID(subjectId));
+        }
+        const subject = subjectRes?.data || subjectRes?.subject || subjectRes || (courseAssignment.subject || {});
+
+        const teacher = courseAssignment.teacher || courseAssignment.teacher_info || {};
+        const teacherName = teacher.first_name && teacher.last_name
+          ? `${teacher.first_name} ${teacher.last_name}`
+          : courseAssignment.teacher_name || "Unknown";
+
+        setCourseInfo({
+          title: subject?.course_name || subject?.title || courseAssignment.title || "Course",
+          code: subject?.course_code || subject?.code || "---",
+          teacher: teacherName,
+          courseId: subjectId
+        });
+
+        // 4) OPTIMIZED: Fetch ALL activities WITH grades for this course in ONE request
+        let activitiesWithGrades: any[] = [];
+        try {
+          const bulkRes = await apiGet(
+            `${API_ENDPOINTS.ACTIVITIES_STUDENT_GRADES}?course_id=${subjectId}&student_id=${student.id}${sectionId ? `&section_id=${sectionId}` : ''}`
+          );
+          activitiesWithGrades = bulkRes.data || bulkRes || [];
+        } catch (err) {
+          console.error('Failed to fetch activities with grades, falling back to old method:', err);
+          // Fallback: fetch without grades
+          const activitiesRes = await apiGet(
+            `${API_ENDPOINTS.ACTIVITIES}?course_id=${subjectId}${sectionId ? `&section_id=${sectionId}` : ''}`
+          );
+          activitiesWithGrades = activitiesRes.data || activitiesRes || [];
+        }
+
+        // 5) Map academic_period_id to period info for each activity
+        const activitiesWithPeriod = activitiesWithGrades.map((act: any) => {
+          const period = periods.find((p: any) => p.id === act.academic_period_id);
+          return {
+            ...act,
+            period_type: period?.period_type,
+            academic_period: period
+          };
+        });
+
+        console.log('Activities loaded:', { 
+          total: activitiesWithPeriod.length,
+          activities: activitiesWithPeriod,
+          periods 
+        });
+
+        // 6) Calculate grades for both Midterm and Final Term (using embedded grades)
+        const midtermData = await fetchGradesForPeriod('Midterm', activitiesWithPeriod, sectionId, student.id);
+        setMidtermGrades(midtermData);
+
+        const finaltermData = await fetchGradesForPeriod('Final Term', activitiesWithPeriod, sectionId, student.id);
+        setFinaltermGrades(finaltermData);
+      } catch (error) {
+        console.error("Error fetching course grade details:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [user?.id, courseId]);
+
+
+  // Calculate weighted score for a set of grade categories
+  const calculateWeightedScore = (categories: GradeCategory[]) => {
+    if (categories.length === 0) return 0;
     return (
-      (gradeBreakdown[0].percentage * gradeBreakdown[0].weight) / 100 +
-      (gradeBreakdown[1].percentage * gradeBreakdown[1].weight) / 100 +
-      (gradeBreakdown[2].percentage * gradeBreakdown[2].weight) / 100
-    ).toFixed(2);
+      (categories[0].percentage * categories[0].weight) / 100 +
+      (categories[1].percentage * categories[1].weight) / 100 +
+      (categories[2].percentage * categories[2].weight) / 100
+    );
   };
-
-  // Calculate scores for both terms
-  const midtermWeightedScore = parseFloat(
-    (
-      (midtermGrades[0].percentage * midtermGrades[0].weight) / 100 +
-      (midtermGrades[1].percentage * midtermGrades[1].weight) / 100 +
-      (midtermGrades[2].percentage * midtermGrades[2].weight) / 100
-    ).toFixed(2)
-  );
-
-  const finaltermWeightedScore = parseFloat(
-    (
-      (finaltermGrades[0].percentage * finaltermGrades[0].weight) / 100 +
-      (finaltermGrades[1].percentage * finaltermGrades[1].weight) / 100 +
-      (finaltermGrades[2].percentage * finaltermGrades[2].weight) / 100
-    ).toFixed(2)
-  );
-
-  // Final grade is average of midterm and final term
-  const finalOverallGrade = parseFloat(((midtermWeightedScore + finaltermWeightedScore) / 2).toFixed(2));
-
-  // Get color and indication based on final grade
-  const getGradeColorAndIndication = (grade: number) => {
-    if (grade <= 1.75) {
-      return { color: "text-white", bgColor: "bg-green-600", borderColor: "border-green-600", indication: "Excellent" };
-    } else if (grade <= 2.75) {
-      return { color: "text-gray-900", bgColor: "bg-yellow-500", borderColor: "border-yellow-500", indication: "Good" };
-    } else if (grade <= 3.00) {
-      return { color: "text-white", bgColor: "bg-blue-600", borderColor: "border-blue-600", indication: "Passing" };
-    } else {
-      return { color: "text-white", bgColor: "bg-red-600", borderColor: "border-red-600", indication: "Fail" };
-    }
-  };
-
-  const finalGradeStyle = getGradeColorAndIndication(finalOverallGrade);
 
   // Transmute to DepEd scale
   const transmute = (percentage: number): string => {
@@ -145,12 +242,42 @@ const CourseGradeDetail = () => {
     return "5.00";
   };
 
-  const weightedScore = parseFloat(calculateWeightedScore());
+  const gradeBreakdown = currentTerm === "midterm" ? midtermGrades : finaltermGrades;
+  const midtermWeightedScore = calculateWeightedScore(midtermGrades);
+  const finaltermWeightedScore = calculateWeightedScore(finaltermGrades);
+  const weightedScore = calculateWeightedScore(gradeBreakdown);
+  const finalOverallGrade = (midtermWeightedScore + finaltermWeightedScore) / 2;
   const finalGrade = transmute(weightedScore);
+
+  // Get color and indication based on final grade
+  const getGradeColorAndIndication = (grade: number) => {
+    if (grade <= 1.75) {
+      return { color: "text-white", bgColor: "bg-green-600", borderColor: "border-green-600", indication: "Excellent" };
+    } else if (grade <= 2.75) {
+      return { color: "text-gray-900", bgColor: "bg-yellow-500", borderColor: "border-yellow-500", indication: "Good" };
+    } else if (grade <= 3.00) {
+      return { color: "text-white", bgColor: "bg-blue-600", borderColor: "border-blue-600", indication: "Passing" };
+    } else {
+      return { color: "text-white", bgColor: "bg-red-600", borderColor: "border-red-600", indication: "Fail" };
+    }
+  };
+
+  const finalGradeStyle = getGradeColorAndIndication(parseFloat(finalGrade));
 
   if (!isAuthenticated) return null;
 
-  if (!courseData) {
+  if (loading) {
+    return (
+      <DashboardLayout>
+        <div className="p-8 flex items-center justify-center min-h-screen">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <span className="ml-3 text-muted-foreground">Loading grade details...</span>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (!courseInfo) {
     return (
       <DashboardLayout>
         <div className="p-8">
@@ -160,7 +287,7 @@ const CourseGradeDetail = () => {
           </Button>
           <Card>
             <CardContent className="p-8 text-center">
-              <p className="text-muted-foreground">No course data available. Please select a course from the grades page.</p>
+              <p className="text-muted-foreground">Course not found. Please select a course from the grades page.</p>
             </CardContent>
           </Card>
         </div>
@@ -180,8 +307,8 @@ const CourseGradeDetail = () => {
         <div className="mb-8">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <h1 className="text-4xl font-bold mb-2">{courseData.course}</h1>
-              <p className="text-muted-foreground text-lg">Your detailed grade breakdown</p>
+              <h1 className="text-4xl font-bold mb-2">{courseInfo.code} - {courseInfo.title}</h1>
+              <p className="text-muted-foreground text-lg">Your detailed grade breakdown for {currentTerm === "midterm" ? "Midterm" : "Final Term"}</p>
             </div>
             <Badge className="bg-success text-success-foreground text-lg px-4 py-2">
               {finalGrade}
@@ -213,6 +340,8 @@ const CourseGradeDetail = () => {
             </Button>
           </div>
         </div>
+
+        {/* Stats Cards */}
         <div className="grid md:grid-cols-3 gap-6 mb-8">
           <Card className="border-0 shadow-sm hover:shadow-md transition-shadow duration-200">
             <CardContent className="p-6">
@@ -222,7 +351,7 @@ const CourseGradeDetail = () => {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Weighted Average</p>
-                  <p className="text-3xl font-bold text-primary">{weightedScore}%</p>
+                  <p className="text-3xl font-bold text-primary">{weightedScore.toFixed(2)}%</p>
                 </div>
               </div>
             </CardContent>
@@ -249,8 +378,8 @@ const CourseGradeDetail = () => {
                   <BookOpen className="h-6 w-6 text-accent" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Letter Grade</p>
-                  <p className="text-3xl font-bold text-accent">{courseData.overall}</p>
+                  <p className="text-sm text-muted-foreground">Instructor</p>
+                  <p className="text-lg font-bold text-accent">{courseInfo.teacher}</p>
                 </div>
               </div>
             </CardContent>
@@ -259,69 +388,77 @@ const CourseGradeDetail = () => {
 
         {/* Grade Components Breakdown */}
         <div className="space-y-6">
-          {gradeBreakdown.map((category, idx) => {
-            const componentWeightedScore = (category.percentage * category.weight) / 100;
-            return (
-              <Card key={idx} className="border-0 shadow-sm hover:shadow-md transition-shadow duration-200">
-                <CardHeader className="pb-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <CardTitle className="text-xl">{category.name}</CardTitle>
-                      <CardDescription>Weight: {category.weight}% of final grade</CardDescription>
+          {gradeBreakdown.length > 0 ? (
+            gradeBreakdown.map((category, idx) => {
+              const componentWeightedScore = (category.percentage * category.weight) / 100;
+              return (
+                <Card key={idx} className="border-0 shadow-sm hover:shadow-md transition-shadow duration-200">
+                  <CardHeader className="pb-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle className="text-xl">{category.name}</CardTitle>
+                        <CardDescription>Weight: {category.weight}% of final grade</CardDescription>
+                      </div>
+                      <Badge variant="outline" className="text-base px-3 py-1">
+                        {category.percentage.toFixed(0)}%
+                      </Badge>
                     </div>
-                    <Badge variant="outline" className="text-base px-3 py-1">
-                      {category.percentage.toFixed(0)}%
-                    </Badge>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {/* Score Display */}
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="p-4 bg-primary/5 rounded-lg border border-primary/20">
-                      <p className="text-sm text-muted-foreground mb-1">Your Score</p>
-                      <p className="text-2xl font-bold text-primary">
-                        {category.score}/{category.maxScore}
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {/* Score Display */}
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="p-4 bg-primary/5 rounded-lg border border-primary/20">
+                        <p className="text-sm text-muted-foreground mb-1">Your Score</p>
+                        <p className="text-2xl font-bold text-primary">
+                          {category.score}/{category.maxScore}
+                        </p>
+                      </div>
+                      <div className="p-4 bg-muted rounded-lg border border-border">
+                        <p className="text-sm text-muted-foreground mb-1">Percentage</p>
+                        <p className="text-2xl font-bold">{category.percentage.toFixed(2)}%</p>
+                      </div>
+                      <div className="p-4 bg-accent/5 rounded-lg border border-accent/20">
+                        <p className="text-sm text-muted-foreground mb-1">Weighted Score</p>
+                        <p className="text-2xl font-bold text-accent">{componentWeightedScore.toFixed(2)}%</p>
+                      </div>
+                    </div>
+
+                    {/* Progress Bar */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="font-medium">Progress</span>
+                        <span className="text-muted-foreground">{category.percentage.toFixed(1)}% complete</span>
+                      </div>
+                      <Progress value={Math.min(category.percentage, 100)} className="h-3" />
+                    </div>
+
+                    {/* Status Message */}
+                    <div className={`p-3 rounded-lg border ${
+                      category.percentage >= 75 
+                        ? "bg-success/10 border-success/20 text-success" 
+                        : category.percentage >= 60
+                        ? "bg-amber-100/70 border-amber-200 text-amber-700"
+                        : "bg-destructive/10 border-destructive/20 text-destructive"
+                    }`}>
+                      <p className="text-sm font-medium">
+                        {category.percentage >= 75 
+                          ? "✓ Good performance in this category" 
+                          : category.percentage >= 60
+                          ? "⚠ You're doing okay, but there's room for improvement"
+                          : "✕ Needs attention - work on this category"}
                       </p>
                     </div>
-                    <div className="p-4 bg-muted rounded-lg border border-border">
-                      <p className="text-sm text-muted-foreground mb-1">Percentage</p>
-                      <p className="text-2xl font-bold">{category.percentage.toFixed(2)}%</p>
-                    </div>
-                    <div className="p-4 bg-accent/5 rounded-lg border border-accent/20">
-                      <p className="text-sm text-muted-foreground mb-1">Weighted Score</p>
-                      <p className="text-2xl font-bold text-accent">{componentWeightedScore.toFixed(2)}%</p>
-                    </div>
-                  </div>
-
-                  {/* Progress Bar */}
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium">Progress</span>
-                      <span className="text-muted-foreground">{category.percentage.toFixed(1)}% complete</span>
-                    </div>
-                    <Progress value={category.percentage} className="h-3" />
-                  </div>
-
-                  {/* Status Message */}
-                  <div className={`p-3 rounded-lg border ${
-                    category.percentage >= 75 
-                      ? "bg-success/10 border-success/20 text-success" 
-                      : category.percentage >= 60
-                      ? "bg-amber-100/70 border-amber-200 text-amber-700"
-                      : "bg-destructive/10 border-destructive/20 text-destructive"
-                  }`}>
-                    <p className="text-sm font-medium">
-                      {category.percentage >= 75 
-                        ? "✓ Good performance in this category" 
-                        : category.percentage >= 60
-                        ? "⚠ You're doing okay, but there's room for improvement"
-                        : "✕ Needs attention - work on this category"}
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
+                  </CardContent>
+                </Card>
+              );
+            })
+          ) : (
+            <Card className="border-0 shadow-sm">
+              <CardContent className="p-8 text-center">
+                <p className="text-muted-foreground">No grades available for this term yet.</p>
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {/* Summary Card */}
@@ -344,12 +481,11 @@ const CourseGradeDetail = () => {
               </div>
               <div className={`flex items-center justify-between p-4 rounded-lg border-2 ${finalGradeStyle.bgColor} ${finalGradeStyle.borderColor}`}>
                 <div>
-                  <span className={`font-bold ${finalGradeStyle.color}`}>Final Grade</span>
+                  <span className={`font-bold ${finalGradeStyle.color}`}>Overall Grade</span>
                   <p className={`text-sm ${finalGradeStyle.color} opacity-90`}>{finalGradeStyle.indication}</p>
                 </div>
                 <span className={`text-2xl font-bold ${finalGradeStyle.color}`}>{transmute(finalOverallGrade)}</span>
               </div>
-              {/* Letter Grade removed per request - showing term grades and final average only */}
             </div>
           </CardContent>
         </Card>

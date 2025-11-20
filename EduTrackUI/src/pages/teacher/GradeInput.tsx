@@ -28,6 +28,7 @@ const GradeInput = () => {
 
   const [academicPeriods, setAcademicPeriods] = useState<any[]>([]);
   const [selectedPeriodId, setSelectedPeriodId] = useState<string | null>(null);
+  const [availablePeriodTypes, setAvailablePeriodTypes] = useState<any[]>([]);
 
   const [courses, setCourses] = useState<any[]>([]);
   const [sections, setSections] = useState<any[]>([]);
@@ -41,7 +42,7 @@ const GradeInput = () => {
   const categorizeActivities = (activities: any[]) => {
     const written: any[] = []; // quiz, assignment, other
     const performance: any[] = []; // project, laboratory, performance
-    const exam: any[] = []; // midterm, final
+    const exam: any[] = []; // exam
 
     activities.forEach(act => {
       const type = (act.type || '').toLowerCase();
@@ -49,7 +50,7 @@ const GradeInput = () => {
         written.push(act);
       } else if (['project', 'laboratory', 'performance'].includes(type)) {
         performance.push(act);
-      } else if (['midterm', 'final'].includes(type)) {
+      } else if (type === 'exam') {
         exam.push(act);
       }
     });
@@ -133,8 +134,131 @@ const GradeInput = () => {
     alert("Download class record template - will generate Excel file with proper format");
   };
 
-  const handleExportClassRecord = () => {
-    alert("Export current class record - will generate Excel file with all grades");
+  const handleExportClassRecord = async () => {
+    if (!selectedCourse || !selectedSection) {
+      alert("Please select a course and section first");
+      return;
+    }
+
+    try {
+      // Build query parameters
+      let query = `course_id=${encodeURIComponent(String(selectedCourse))}&section_id=${encodeURIComponent(String(selectedSection))}`;
+      
+      if (selectedPeriodId) {
+        query += `&academic_period_id=${encodeURIComponent(String(selectedPeriodId))}`;
+      }
+
+      // Download using fetch with credentials
+      const url = `${API_ENDPOINTS.EXPORT_CLASS_RECORD}?${query}`;
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        credentials: 'include', // Important for session cookies
+      });
+
+      if (!response.ok) {
+        // Try to get error message from response
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Export failed');
+        }
+        throw new Error(`Export failed with status ${response.status}`);
+      }
+
+      // Get the blob from response
+      const blob = await response.blob();
+      
+      // Create download link
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      
+      // Get filename from Content-Disposition header or use default
+      const contentDisposition = response.headers.get('Content-Disposition');
+      let filename = 'ClassRecord.csv';
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/);
+        if (filenameMatch && filenameMatch[1]) {
+          filename = filenameMatch[1].replace(/"/g, '');
+        }
+      }
+      
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Clean up the blob URL
+      window.URL.revokeObjectURL(downloadUrl);
+      
+    } catch (error: any) {
+      console.error('Export failed:', error);
+      alert('Failed to export class record: ' + (error.message || 'Unknown error'));
+    }
+  };
+
+  const handleExportClassRecordExcel = async () => {
+    if (!selectedCourse || !selectedSection) {
+      alert("Please select a course and section first");
+      return;
+    }
+
+    try {
+      // Build query parameters
+      let query = `course_id=${encodeURIComponent(String(selectedCourse))}&section_id=${encodeURIComponent(String(selectedSection))}`;
+      
+      if (selectedPeriodId) {
+        query += `&academic_period_id=${encodeURIComponent(String(selectedPeriodId))}`;
+      }
+
+      // Download using fetch with credentials
+      const url = `${API_ENDPOINTS.EXPORT_CLASS_RECORD_EXCEL}?${query}`;
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Export failed');
+        }
+        throw new Error(`Export failed with status ${response.status}`);
+      }
+
+      // Get the blob from response
+      const blob = await response.blob();
+      
+      // Create download link
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      
+      // Get filename from Content-Disposition header or use default
+      const contentDisposition = response.headers.get('Content-Disposition');
+      let filename = 'ClassRecord.xlsx';
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/);
+        if (filenameMatch && filenameMatch[1]) {
+          filename = filenameMatch[1].replace(/"/g, '');
+        }
+      }
+      
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Clean up the blob URL
+      window.URL.revokeObjectURL(downloadUrl);
+      
+    } catch (error: any) {
+      console.error('Export Excel failed:', error);
+      alert('Failed to export Excel: ' + (error.message || 'Unknown error'));
+    }
   };
 
   const handleSaveGrades = () => {
@@ -161,6 +285,15 @@ const GradeInput = () => {
               if (s.includes('1st')) setSelectedSemester('1st');
               else if (s.includes('2nd')) setSelectedSemester('2nd');
               else setSelectedSemester('summer');
+              
+              // Set available period types for active semester
+              const periodsForSemester = plist.filter((p: any) => p.semester === active.semester);
+              setAvailablePeriodTypes(periodsForSemester);
+              
+              // Set term based on period_type
+              const pt = (active.period_type || '').toLowerCase();
+              if (pt.includes('midterm')) setSelectedTerm('midterm');
+              else if (pt.includes('final')) setSelectedTerm('final');
             }
           }
         } catch (e) {
@@ -170,25 +303,54 @@ const GradeInput = () => {
         // teacher assignments -> courses
         try {
           const tRes = await apiGet(`${API_ENDPOINTS.TEACHER_ASSIGNMENTS}/my`);
-          const tlist = tRes.data ?? tRes.assignments ?? tRes ?? [];
+          const tlist = tRes.data ?? tRes.assigned_courses ?? tRes.assignments ?? tRes ?? [];
           if (mounted && Array.isArray(tlist)) {
             // Map to course objects (handle different shapes)
             const mapped = tlist.map((a: any) => {
+              // Handle various response structures
               const subj = a.subject ?? a;
+              const courseId = a.teacher_subject_id ?? a.id ?? a.subject_id ?? subj.id ?? subj.subject_id;
+              const courseCode = a.course_code ?? subj.course_code ?? subj.code ?? a.code;
+              const courseName = a.course_name ?? subj.course_name ?? subj.title ?? subj.name;
+              const semester = a.semester ?? subj.semester ?? null;
+              const yearLevel = a.year_level ?? subj.year_level ?? null;
+              
+              // Extract sections
+              let sectionsList = [];
+              if (Array.isArray(a.sections)) {
+                sectionsList = a.sections.map((s: any) => ({ 
+                  id: s.id ?? s.section_id, 
+                  name: s.name ?? s.title ?? s.section_name 
+                }));
+              } else if (Array.isArray(subj.sections)) {
+                sectionsList = subj.sections.map((s: any) => ({ 
+                  id: s.id ?? s.section_id, 
+                  name: s.name ?? s.title ?? s.section_name 
+                }));
+              }
+
               return {
-                id: a.id ?? a.subject_id ?? subj.id ?? subj.subject_id,
-                code: subj.course_code ?? subj.code ?? a.course_code ?? a.code,
-                title: subj.course_name ?? subj.title ?? subj.name ?? a.course_name,
-                semester: subj.semester ?? a.semester ?? null,
-                year_level: subj.year_level ?? a.year_level ?? null,
+                id: courseId,
+                code: courseCode,
+                title: courseName,
+                semester: semester,
+                year_level: yearLevel,
                 teacher: a.teacher_name ?? (user?.name ?? ''),
-                sections: Array.isArray(a.sections) ? a.sections.map((s: any) => ({ id: s.id ?? s.section_id, name: s.name ?? s.title })) : (Array.isArray(subj.sections) ? subj.sections.map((s: any) => ({ id: s.id ?? s.section_id, name: s.name ?? s.title })) : []),
+                sections: sectionsList,
               };
             });
+
+            console.log('Fetched courses:', mapped); // Debug log
             setCourses(mapped);
+            
             if (mapped.length > 0) {
               setSelectedCourse(String(mapped[0].id));
-              setCourseInfo({ code: mapped[0].code ?? '', title: mapped[0].title ?? '', teacher: mapped[0].teacher ?? (user?.name ?? ''), section: mapped[0].sections && mapped[0].sections[0] ? mapped[0].sections[0].name : '' });
+              setCourseInfo({ 
+                code: mapped[0].code ?? '', 
+                title: mapped[0].title ?? '', 
+                teacher: mapped[0].teacher ?? (user?.name ?? ''), 
+                section: mapped[0].sections && mapped[0].sections[0] ? mapped[0].sections[0].name : '' 
+              });
               // set sections for first course
               setSections(mapped[0].sections ?? []);
               if (mapped[0].sections && mapped[0].sections.length > 0) {
@@ -197,6 +359,7 @@ const GradeInput = () => {
             }
           }
         } catch (e) {
+          console.error('Failed to fetch teacher assignments:', e);
           // fallback: try fetch subjects list
           try {
             const sres = await apiGet(API_ENDPOINTS.SUBJECTS);
@@ -220,6 +383,38 @@ const GradeInput = () => {
     fetchInitial();
     return () => { mounted = false; };
   }, [user]);
+
+  // When selectedSemester changes, update available period types
+  useEffect(() => {
+    if (!selectedSemester || !academicPeriods.length) return;
+    
+    // Find all periods for the selected semester
+    let semesterMatch = '';
+    if (selectedSemester === '1st') semesterMatch = '1st Semester';
+    else if (selectedSemester === '2nd') semesterMatch = '2nd Semester';
+    else if (selectedSemester === 'summer') semesterMatch = 'Summer';
+    
+    const periodsForSemester = academicPeriods.filter((p: any) => {
+      const pSem = (p.semester || '').toLowerCase();
+      return pSem.includes(semesterMatch.toLowerCase());
+    });
+    
+    setAvailablePeriodTypes(periodsForSemester);
+    
+    // Auto-select first available period for this semester if current selection is not valid
+    if (periodsForSemester.length > 0) {
+      const currentPeriod = academicPeriods.find((p: any) => String(p.id) === String(selectedPeriodId));
+      const currentIsValid = currentPeriod && periodsForSemester.some((p: any) => p.id === currentPeriod.id);
+      
+      if (!currentIsValid) {
+        const firstPeriod = periodsForSemester[0];
+        setSelectedPeriodId(String(firstPeriod.id));
+        const pt = (firstPeriod.period_type || '').toLowerCase();
+        if (pt.includes('midterm')) setSelectedTerm('midterm');
+        else if (pt.includes('final')) setSelectedTerm('final');
+      }
+    }
+  }, [selectedSemester, academicPeriods, selectedPeriodId]);
 
   // When selectedSemester changes, filter courses by semester
   useEffect(() => {
@@ -272,21 +467,26 @@ const GradeInput = () => {
     }
   }, [selectedCourse, courses, user]);
 
-  // When selectedSection or selectedTerm changes, fetch activities
+  // When selectedSection or selectedPeriodId changes, fetch activities
   useEffect(() => {
     let mounted = true;
     const fetchActivities = async () => {
-      if (!selectedCourse || !selectedSection || !selectedTerm) return;
+      if (!selectedCourse || !selectedSection) return;
       try {
         setLoading((l) => ({ ...l, activities: true }));
         
-        // Map term to grading_period
-        const gradingPeriod = selectedTerm === 'midterm' ? 'midterm' : 'final';
+        // Build query params - filter by academic_period_id if selected
+        let query = `course_id=${encodeURIComponent(String(selectedCourse))}&section_id=${encodeURIComponent(String(selectedSection))}`;
         
-        const res = await apiGet(`${API_ENDPOINTS.ACTIVITIES}?course_id=${encodeURIComponent(String(selectedCourse))}&section_id=${encodeURIComponent(String(selectedSection))}&grading_period=${gradingPeriod}`);
+        if (selectedPeriodId) {
+          query += `&academic_period_id=${encodeURIComponent(String(selectedPeriodId))}`;
+        }
+        
+        const res = await apiGet(`${API_ENDPOINTS.ACTIVITIES}?${query}`);
         const list = res.data ?? res.activities ?? res ?? [];
         
         if (mounted && Array.isArray(list)) {
+          console.log('Fetched activities:', list); // Debug log
           setActivities(list);
         } else {
           setActivities([]);
@@ -300,7 +500,7 @@ const GradeInput = () => {
     };
     fetchActivities();
     return () => { mounted = false; };
-  }, [selectedCourse, selectedSection, selectedTerm]);
+  }, [selectedCourse, selectedSection, selectedPeriodId]);
 
   // When selectedSection changes, fetch students for that section
   useEffect(() => {
@@ -367,7 +567,11 @@ const GradeInput = () => {
             </Button>
             <Button variant="outline" onClick={handleExportClassRecord}>
               <FileSpreadsheet className="h-4 w-4 mr-2" />
-              Export Class Record
+              Export CSV
+            </Button>
+            <Button variant="outline" onClick={handleExportClassRecordExcel}>
+              <FileSpreadsheet className="h-4 w-4 mr-2" />
+              Export Excel
             </Button>
             <Button onClick={handleSaveGrades}>
               <Save className="h-4 w-4 mr-2" />
@@ -384,33 +588,72 @@ const GradeInput = () => {
                 <Label className="text-xs text-muted-foreground">Semester / Period</Label>
                 <Select value={selectedPeriodId ?? undefined} onValueChange={(v) => {
                   setSelectedPeriodId(v);
-                  const p = academicPeriods.find((x) => String(x.id) === String(v));
+                  const p = academicPeriods.find((x: any) => String(x.id) === String(v));
                   if (p) {
                     const s = (p.semester || '').toLowerCase();
                     if (s.includes('1st')) setSelectedSemester('1st');
                     else if (s.includes('2nd')) setSelectedSemester('2nd');
                     else setSelectedSemester('summer');
+                    
+                    // Update term based on period type
+                    const pt = (p.period_type || '').toLowerCase();
+                    if (pt.includes('midterm')) setSelectedTerm('midterm');
+                    else if (pt.includes('final')) setSelectedTerm('final');
                   }
                 }}>
                   <SelectTrigger className="h-9">
                     <SelectValue placeholder="Select period" />
                   </SelectTrigger>
                   <SelectContent>
-                    {academicPeriods.map((p) => (
-                      <SelectItem key={p.id} value={String(p.id)}>{`${p.school_year} • ${p.semester}`}</SelectItem>
-                    ))}
+                    {(() => {
+                      // Get distinct school_year + semester combinations
+                      const seen = new Map();
+                      return academicPeriods
+                        .filter((p: any) => {
+                          const key = `${p.school_year}-${p.semester}`;
+                          if (seen.has(key)) return false;
+                          seen.set(key, p);
+                          return true;
+                        })
+                        .map((p: any) => (
+                          <SelectItem key={`${p.school_year}-${p.semester}`} value={String(p.id)}>{`${p.school_year} • ${p.semester}`}</SelectItem>
+                        ));
+                    })()}
                   </SelectContent>
                 </Select>
               </div>
               <div>
                 <Label className="text-xs text-muted-foreground">Term</Label>
-                <Select value={selectedTerm} onValueChange={setSelectedTerm}>
+                <Select value={selectedTerm} onValueChange={(v) => {
+                  setSelectedTerm(v);
+                  // Find the period that matches the selected term for current semester
+                  const matchingPeriod = availablePeriodTypes.find((p: any) => {
+                    const pt = (p.period_type || '').toLowerCase();
+                    return (v === 'midterm' && pt.includes('midterm')) || (v === 'final' && pt.includes('final'));
+                  });
+                  if (matchingPeriod) {
+                    setSelectedPeriodId(String(matchingPeriod.id));
+                  }
+                }}>
                   <SelectTrigger className="h-9">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="midterm">Midterm</SelectItem>
-                    <SelectItem value="final">Final Term</SelectItem>
+                    {availablePeriodTypes
+                      .filter((p: any, index: number, self: any[]) => {
+                        // Remove duplicates by period_type
+                        const pt = (p.period_type || '').toLowerCase();
+                        return index === self.findIndex((t: any) => (t.period_type || '').toLowerCase() === pt);
+                      })
+                      .map((p: any) => {
+                        const pt = (p.period_type || '').toLowerCase();
+                        const value = pt.includes('midterm') ? 'midterm' : 'final';
+                        return (
+                          <SelectItem key={p.id} value={value}>
+                            {p.period_type}
+                          </SelectItem>
+                        );
+                      })}
                   </SelectContent>
                 </Select>
               </div>
@@ -484,7 +727,7 @@ const GradeInput = () => {
               <div>
                 <Button
                   onClick={() => {
-                    const url = `/teacher/grade-input-edit?course=${selectedCourse}&section=${selectedSection}&term=${selectedTerm}&semester=${selectedSemester}`;
+                    const url = `/teacher/grade-input-edit?course=${selectedCourse}&section=${selectedSection}&term=${selectedTerm}&semester=${selectedSemester}&period_id=${selectedPeriodId || ''}`;
                     window.open(url, "_blank", "noopener,noreferrer");
                   }}
                 >
@@ -497,9 +740,9 @@ const GradeInput = () => {
           <CardContent>
                 <div className="overflow-x-auto overflow-y-auto max-h-[600px] border rounded-lg">
               <table className="w-full border-collapse text-xs">
-                <thead className="sticky top-0 z-20">
-                  <tr className="border-b-2 border-border">
-                    <th className="p-2 text-left font-semibold sticky left-0 z-30 bg-background border-r border-border min-w-[200px]">
+                <thead className="sticky top-0 z-20 bg-background">
+                  <tr className="border-b-2 border-border bg-background">
+                    <th className="p-2 text-left font-semibold sticky left-0 z-30 bg-background border-r border-border min-w-[200px] max-w-[200px] w-[200px]">
                       Learner's Name
                     </th>
                     {/* Written Works (30%) */}
@@ -520,7 +763,7 @@ const GradeInput = () => {
                     </th>
                   </tr>
                   <tr className="border-b border-border bg-muted/50">
-                    <th className="p-2 text-left text-xs font-medium sticky left-0 z-30 bg-muted/50 border-r border-border">ID / Name</th>
+                    <th className="p-2 text-left text-xs font-medium sticky left-0 z-30 bg-muted border-r border-border min-w-[200px] max-w-[200px] w-[200px]">ID / Name</th>
                     {/* Written sub-columns */}
                     {categorizeActivities(activities).written.map((act, idx) => (
                       <th key={`wh${idx}`} className="p-1 text-center font-medium w-12 bg-table-written/50" title={act.title}>
@@ -554,7 +797,7 @@ const GradeInput = () => {
                     <th className="p-1 text-center font-medium w-16 bg-table-total">Grade<br/><span className="text-[10px] font-normal">(1.0-5.0)</span></th>
                   </tr>
                   <tr className="border-b border-border bg-muted/30 text-[10px]">
-                    <th className="p-1 text-right font-medium sticky left-0 z-30 bg-muted/30 border-r border-border">HPS →</th>
+                    <th className="p-1 text-right font-medium sticky left-0 z-30 bg-muted border-r border-border min-w-[200px] max-w-[200px] w-[200px]">HPS →</th>
                     {/* Written Works HPS */}
                     {categorizeActivities(activities).written.map((act, idx) => (
                       <th key={`whps${idx}`} className="p-1 text-center text-muted-foreground bg-table-written/30">{act.max_score}</th>
@@ -590,7 +833,7 @@ const GradeInput = () => {
 
                     return (
                       <tr key={idx} className="border-b border-border hover:bg-muted/30 transition-colors">
-                        <td className="p-2 sticky left-0 z-20 bg-background border-r border-border">
+                        <td className="p-2 sticky left-0 z-10 bg-background border-r border-border min-w-[200px] max-w-[200px] w-[200px]">
                           <div>
                             <p className="font-medium text-xs">{idx + 1}. {student.name}</p>
                             <p className="text-[10px] text-muted-foreground">{student.id}</p>

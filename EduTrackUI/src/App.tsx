@@ -23,6 +23,8 @@ import Announcements from "./pages/admin/Announcements";
 import Payments from "./pages/admin/Payments";
 import PDFGeneration from "./pages/admin/PDFGeneration";
 import AdminSettings from "./pages/admin/AdminSettings";
+import AcademicPeriods from "./pages/admin/AcademicPeriods";
+import Campuses from "./pages/admin/Campuses";
 import Teachers from "./pages/admin/users/Teachers";
 import TeacherCourseAssignment from "./pages/admin/users/TeacherCourseAssignment";
 import Students from "./pages/admin/users/Students";
@@ -51,6 +53,7 @@ import MyGrades from "./pages/student/MyGrades";
 import MyProgress from "./pages/student/MyProgress";
 import CourseGradeDetail from "./pages/student/CourseGradeDetail";
 import StudentSettings from "./pages/student/StudentSettings";
+import AttendanceQR from "./pages/student/AttendanceQR";
 
 const queryClient = new QueryClient();
 
@@ -81,9 +84,10 @@ const App = () => (
             <Route path="/student/activities" element={<ProtectedRoute requiredRole="student"><MyActivities /></ProtectedRoute>} />
             <Route path="/student/grades" element={<ProtectedRoute requiredRole="student"><MyGrades /></ProtectedRoute>} />
             <Route path="/student/progress" element={<ProtectedRoute requiredRole="student"><MyProgress /></ProtectedRoute>} />
-            <Route path="/student/course-grade-detail" element={<ProtectedRoute requiredRole="student"><CourseGradeDetail /></ProtectedRoute>} />
+            <Route path="/student/course-grade-detail/:courseId" element={<ProtectedRoute requiredRole="student"><CourseGradeDetail /></ProtectedRoute>} />
             <Route path="/student/settings" element={<ProtectedRoute requiredRole="student"><StudentSettings /></ProtectedRoute>} />
             <Route path="/student/courses/:courseId" element={<ProtectedRoute requiredRole="student"><CourseDetails /></ProtectedRoute>} />
+            <Route path="/student/attendance-qr" element={<ProtectedRoute requiredRole="student"><AttendanceQR /></ProtectedRoute>} />
             
             {/* Teacher Routes */}
             <Route path="/teacher/dashboard" element={<ProtectedRoute requiredRole="teacher"><TeacherDashboard /></ProtectedRoute>} />
@@ -114,6 +118,8 @@ const App = () => (
             <Route path="/admin/announcements" element={<ProtectedRoute requiredRole="admin"><Announcements /></ProtectedRoute>} />
             <Route path="/admin/payments" element={<ProtectedRoute requiredRole="admin"><Payments /></ProtectedRoute>} />
             <Route path="/admin/pdf" element={<ProtectedRoute requiredRole="admin"><PDFGeneration /></ProtectedRoute>} />
+            <Route path="/admin/academic-periods" element={<ProtectedRoute requiredRole="admin"><AcademicPeriods /></ProtectedRoute>} />
+            <Route path="/admin/campuses" element={<ProtectedRoute requiredRole="admin"><Campuses /></ProtectedRoute>} />
             <Route path="/admin/settings" element={<ProtectedRoute requiredRole="admin"><AdminSettings /></ProtectedRoute>} />
             
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

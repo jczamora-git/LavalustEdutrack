@@ -22,12 +22,14 @@ export const API_ENDPOINTS = {
   // Student Management
   STUDENTS: `${API_BASE_URL}/api/students`,
   STUDENT_BY_ID: (id: string | number) => `${API_BASE_URL}/api/students/${id}`,
+  STUDENT_BY_USER: (user_id: string | number) => `${API_BASE_URL}/api/students/by-user/${user_id}`,
   STUDENTS_IMPORT: `${API_BASE_URL}/api/students/import`,
   STUDENTS_EXPORT: `${API_BASE_URL}/api/students/export`,
   
-  // Subjects & Sections
+  // Subjects
   SUBJECTS: `${API_BASE_URL}/api/subjects`,
   SUBJECT_BY_ID: (id: string | number) => `${API_BASE_URL}/api/subjects/${id}`,
+  SUBJECTS_FOR_STUDENT: `${API_BASE_URL}/api/subjects/for-student`,
 
   // Year levels & year_level_sections
   YEAR_LEVELS: `${API_BASE_URL}/api/year-levels`,
@@ -36,6 +38,8 @@ export const API_ENDPOINTS = {
   // Teacher assignments
   TEACHER_ASSIGNMENTS: `${API_BASE_URL}/api/teacher-assignments`,
   TEACHER_ASSIGNMENTS_BY_TEACHER: (teacher_id: string | number) => `${API_BASE_URL}/api/teacher-assignments/by-teacher/${teacher_id}`,
+  TEACHER_ASSIGNMENTS_FOR_STUDENT: `${API_BASE_URL}/api/teacher-assignments/for-student`,
+  TEACHER_BY_ID_PUBLIC: (id: string | number) => `${API_BASE_URL}/api/teachers/${id}/public`,
   // Student subjects (enrollments)
   STUDENT_SUBJECTS: `${API_BASE_URL}/api/student-subjects`,
   // Sections
@@ -45,8 +49,22 @@ export const API_ENDPOINTS = {
   ACTIVITIES: `${API_BASE_URL}/api/activities`,
   ACTIVITY_BY_ID: (id: string | number) => `${API_BASE_URL}/api/activities/${id}`,
   ACTIVITY_GRADES: (id: string | number) => `${API_BASE_URL}/api/activities/${id}/grades`,
+  ACTIVITIES_STUDENT_GRADES: `${API_BASE_URL}/api/activities/student-grades`,
+  ACTIVITIES_STUDENT_ALL: `${API_BASE_URL}/api/activities/student-all`,
+  EXPORT_CLASS_RECORD: `${API_BASE_URL}/api/activities/export-class-record`,
+  EXPORT_CLASS_RECORD_EXCEL: `${API_BASE_URL}/api/activities/export-class-record-excel`,
+  
   // Academic periods
   ACADEMIC_PERIODS: `${API_BASE_URL}/api/academic-periods`,
+  ACADEMIC_PERIODS_STATS: `${API_BASE_URL}/api/academic-periods/stats`,
+  ACADEMIC_PERIODS_ACTIVE: `${API_BASE_URL}/api/academic-periods/active`,
+  ACADEMIC_PERIODS_GRADING_CONTEXT: `${API_BASE_URL}/api/academic-periods/grading-context`,
+  ACADEMIC_PERIODS_CURRENT_SUBJECTS: `${API_BASE_URL}/api/academic-periods/current-subjects`,
+  ACADEMIC_PERIOD_BY_ID: (id: string | number) => `${API_BASE_URL}/api/academic-periods/${id}`,
+  ACADEMIC_PERIOD_SET_ACTIVE: (id: string | number) => `${API_BASE_URL}/api/academic-periods/${id}/set-active`,
+  // Campuses (location for attendance)
+  CAMPUSES: `${API_BASE_URL}/api/campuses`,
+  CAMPUS_BY_ID: (id: string | number) => `${API_BASE_URL}/api/campuses/${id}`,
 };
 
 // API helper functions

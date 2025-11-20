@@ -33,6 +33,7 @@ const GradeInputEdit = () => {
   const selectedSection = searchParams.get("section");
   const selectedTerm = searchParams.get("term") || "midterm";
   const selectedSemester = searchParams.get("semester") || "1st";
+  const urlPeriodId = searchParams.get("period_id");
 
   const [courseInfo, setCourseInfo] = useState({
     code: "",
@@ -47,6 +48,8 @@ const GradeInputEdit = () => {
   const [loading, setLoading] = useState(true);
   const [courses, setCourses] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [academicPeriods, setAcademicPeriods] = useState<any[]>([]);
+  const [selectedPeriodId, setSelectedPeriodId] = useState<string | null>(null);
 
   // Helper to categorize activities by grading component
   const categorizeActivities = (activities: any[]) => {
@@ -60,7 +63,7 @@ const GradeInputEdit = () => {
         written.push(act);
       } else if (['project', 'laboratory', 'performance'].includes(type)) {
         performance.push(act);
-      } else if (['midterm', 'final'].includes(type)) {
+      } else if (type === 'exam') {
         exam.push(act);
       }
     });
@@ -94,6 +97,36 @@ const GradeInputEdit = () => {
       try {
         setLoading(true);
 
+        // Fetch academic periods first
+        const periodsRes = await apiGet(API_ENDPOINTS.ACADEMIC_PERIODS);
+        const periodsList = periodsRes.data ?? periodsRes.academic_periods ?? periodsRes ?? [];
+        if (mounted && Array.isArray(periodsList)) {
+          setAcademicPeriods(periodsList);
+        }
+
+        // Determine academic_period_id from URL or semester/term match
+        let determinedPeriodId: string | null = urlPeriodId;
+        
+        if (!determinedPeriodId && Array.isArray(periodsList)) {
+          // Match semester and period_type (term) if period_id not in URL
+          const matchedPeriod = periodsList.find((p: any) => {
+            const periodSemester = (p.semester || '').toLowerCase();
+            const periodType = (p.period_type || '').toLowerCase();
+            const urlSemester = (selectedSemester || '').toLowerCase();
+            const urlTerm = (selectedTerm || '').toLowerCase();
+            
+            return periodSemester === urlSemester && periodType === urlTerm;
+          });
+          
+          if (matchedPeriod) {
+            determinedPeriodId = String(matchedPeriod.id);
+          }
+        }
+        
+        if (mounted && determinedPeriodId) {
+          setSelectedPeriodId(determinedPeriodId);
+        }
+
         // Fetch course info
         const courseRes = await apiGet(`${API_ENDPOINTS.TEACHER_ASSIGNMENTS}/my`);
         const courseList = courseRes.assigned_courses ?? courseRes.data ?? courseRes.assignments ?? courseRes ?? [];
@@ -114,10 +147,14 @@ const GradeInputEdit = () => {
           }
         }
 
-        // Fetch activities
-        const gradingPeriod = selectedTerm === 'midterm' ? 'midterm' : 'final';
-        const actRes = await apiGet(`${API_ENDPOINTS.ACTIVITIES}?course_id=${encodeURIComponent(String(selectedCourse))}&section_id=${encodeURIComponent(String(selectedSection))}&grading_period=${gradingPeriod}`);
+        // Fetch activities - filter by academic_period_id
+        let activityQuery = `course_id=${encodeURIComponent(String(selectedCourse))}&section_id=${encodeURIComponent(String(selectedSection))}`;
+        if (determinedPeriodId) {
+          activityQuery += `&academic_period_id=${encodeURIComponent(determinedPeriodId)}`;
+        }
+        const actRes = await apiGet(`${API_ENDPOINTS.ACTIVITIES}?${activityQuery}`);
         const actList = actRes.data ?? actRes.activities ?? actRes ?? [];
+        
         if (mounted && Array.isArray(actList)) {
           setActivities(actList);
         }
@@ -190,7 +227,7 @@ const GradeInputEdit = () => {
 
     fetchData();
     return () => { mounted = false; };
-  }, [selectedCourse, selectedSection, selectedTerm, user]);
+  }, [selectedCourse, selectedSection, selectedTerm, selectedSemester, urlPeriodId, user]);
 
   const confirm = useConfirm();
 

@@ -48,6 +48,15 @@ class SubjectController extends Controller
 
             $subjects = $this->SubjectModel->get_all($filters);
 
+            // If semester was provided and there are no results, try falling back
+            // to year-only filtering (some data may have inconsistent semester labels)
+            if ((empty($subjects) || count($subjects) === 0) && !empty($filters['semester']) && !empty($filters['year_level'])) {
+                // remove semester filter and re-query
+                $fallbackFilters = $filters;
+                unset($fallbackFilters['semester']);
+                $subjects = $this->SubjectModel->get_all($fallbackFilters);
+            }
+
             echo json_encode(['success' => true, 'subjects' => $subjects, 'count' => count($subjects)]);
         } catch (Exception $e) {
             http_response_code(500);
@@ -62,9 +71,10 @@ class SubjectController extends Controller
     {
          api_set_json_headers();
 
-        if (!$this->is_admin()) {
+        // Allow any authenticated user to fetch a single subject (students need this)
+        if ($this->session->userdata('logged_in') !== true) {
             http_response_code(403);
-            echo json_encode(['success' => false, 'message' => 'Access denied. Admin only.']);
+            echo json_encode(['success' => false, 'message' => 'Access denied. Login required.']);
             return;
         }
 
@@ -245,6 +255,96 @@ class SubjectController extends Controller
                 http_response_code(500);
                 echo json_encode(['success' => false, 'message' => 'Failed to delete subject']);
             }
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'message' => 'Server error: ' . $e->getMessage()]);
+        }
+    }
+
+    /**
+     * GET /api/subjects/for-student
+     * Student-accessible endpoint: returns subjects filtered by year_level and semester
+     * Expects query params: year_level (numeric), semester (e.g. '1st' or '1')
+     */
+    public function api_get_for_student()
+    {
+        api_set_json_headers();
+
+        if (!$this->session->userdata('logged_in')) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Not authenticated']);
+            return;
+        }
+
+        try {
+            $filters = [];
+
+            // Normalize year_level: accept numeric (1, '1') or strings like '1st', '1st Year'
+            if (!empty($_GET['year_level'])) {
+                $rawYear = trim((string)$_GET['year_level']);
+                $yearNum = null;
+                if (is_numeric($rawYear)) {
+                    $yearNum = (int)$rawYear;
+                } else {
+                    // try to extract a number from strings like '1st', '1st Year'
+                    if (preg_match('/(\d+)/', $rawYear, $m)) {
+                        $yearNum = (int)$m[1];
+                    }
+                }
+
+                if ($yearNum !== null && $yearNum >= 1 && $yearNum <= 4) {
+                    // Convert to DB representation (e.g., '1st Year')
+                    $suffix = 'th';
+                    if ($yearNum % 10 === 1 && $yearNum % 100 !== 11) $suffix = 'st';
+                    elseif ($yearNum % 10 === 2 && $yearNum % 100 !== 12) $suffix = 'nd';
+                    elseif ($yearNum % 10 === 3 && $yearNum % 100 !== 13) $suffix = 'rd';
+                    $filters['year_level'] = $yearNum . $suffix . ' Year';
+                } else {
+                    // pass-through (maybe already '1st Year')
+                    $filters['year_level'] = $rawYear;
+                }
+            }
+
+            // Normalize semester: accept '1', '1st', '1st Semester', '2', '2nd', '2nd Semester', 'summer'
+            if (!empty($_GET['semester'])) {
+                $rawSem = trim((string)$_GET['semester']);
+                $low = strtolower($rawSem);
+                $semNormalized = null;
+
+                if (preg_match('/^\s*1(st)?/i', $rawSem) || $low === '1') {
+                    $semNormalized = '1st Semester';
+                } elseif (preg_match('/^\s*2(nd)?/i', $rawSem) || $low === '2') {
+                    $semNormalized = '2nd Semester';
+                } elseif (strpos($low, 'summer') !== false) {
+                    $semNormalized = 'Summer';
+                } elseif (stripos($rawSem, 'first') !== false) {
+                    $semNormalized = '1st Semester';
+                } elseif (stripos($rawSem, 'second') !== false) {
+                    $semNormalized = '2nd Semester';
+                }
+
+                $filters['semester'] = $semNormalized ?? $rawSem;
+            }
+
+            if (!empty($_GET['status'])) {
+                $filters['status'] = $_GET['status'];
+            }
+            if (!empty($_GET['search'])) {
+                $filters['search'] = $_GET['search'];
+            }
+
+            // First attempt using provided filters
+            $subjects = $this->SubjectModel->get_all($filters);
+
+            // If semester was provided and there are no results, try falling back
+            // to year-only filtering (some data may have inconsistent semester labels)
+            if ((empty($subjects) || count($subjects) === 0) && !empty($filters['semester']) && !empty($filters['year_level'])) {
+                $fallback = $filters;
+                unset($fallback['semester']);
+                $subjects = $this->SubjectModel->get_all($fallback);
+            }
+
+            echo json_encode(['success' => true, 'subjects' => $subjects, 'count' => count($subjects)]);
         } catch (Exception $e) {
             http_response_code(500);
             echo json_encode(['success' => false, 'message' => 'Server error: ' . $e->getMessage()]);

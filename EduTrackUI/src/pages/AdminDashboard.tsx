@@ -2,12 +2,23 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Users, BookOpen, GraduationCap, Settings, LogOut, Plus, TrendingUp } from "lucide-react";
+import { Users, BookOpen, GraduationCap, Settings, LogOut, Plus, TrendingUp, Calendar, Edit } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { DashboardLayout } from "@/components/DashboardLayout";
+import { useQuery } from "@tanstack/react-query";
+import { API_ENDPOINTS, apiGet } from "@/lib/api";
 
 const AdminDashboard = () => {
   const { user } = useAuth();
+  
+  // Fetch active academic period
+  const { data: activePeriodData } = useQuery({
+    queryKey: ['academic-period', 'active'],
+    queryFn: () => apiGet(API_ENDPOINTS.ACADEMIC_PERIODS_ACTIVE),
+  });
+  
+  const activePeriod = activePeriodData?.data;
+  
   const stats = [
     { label: "Total Students", value: "1,234", icon: Users, color: "primary" },
     { label: "Total Teachers", value: "89", icon: GraduationCap, color: "accent" },
@@ -31,16 +42,70 @@ const AdminDashboard = () => {
     <DashboardLayout>
       <div className="container mx-auto px-4 py-8">
         {/* Welcome Section */}
-        <div className="mb-8 flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold mb-2">Welcome, {user?.name}</h1>
-            <p className="text-muted-foreground">System overview and management</p>
-          </div>
-          <Button>
-            <Plus className="h-4 w-4 mr-2" />
-            Create User
-          </Button>
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold mb-2">Welcome, {user?.name}</h1>
+          <p className="text-muted-foreground">System overview and management</p>
         </div>
+
+        {/* Current Academic Period Card */}
+        <Card className="mb-6 border-primary/20 bg-gradient-to-r from-primary/5 to-accent/5">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <Calendar className="h-6 w-6 text-primary" />
+                </div>
+                <div>
+                  <CardTitle className="text-xl">Current Academic Period</CardTitle>
+                  <CardDescription>Active grading period for the system</CardDescription>
+                </div>
+              </div>
+              <Link to="/admin/academic-periods">
+                <Button variant="outline" size="sm">
+                  <Edit className="h-4 w-4 mr-2" />
+                  Manage Periods
+                </Button>
+              </Link>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {activePeriod ? (
+              <div className="grid md:grid-cols-4 gap-4">
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">School Year</p>
+                  <p className="text-lg font-bold text-primary">{activePeriod.school_year}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">Semester</p>
+                  <p className="text-lg font-bold">{activePeriod.semester}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">Grading Period</p>
+                  <Badge className="text-sm px-3 py-1">
+                    {activePeriod.period_type}
+                  </Badge>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">Period Duration</p>
+                  <p className="text-sm font-medium">
+                    {new Date(activePeriod.start_date).toLocaleDateString()} - {new Date(activePeriod.end_date).toLocaleDateString()}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <Calendar className="h-12 w-12 text-muted-foreground mx-auto mb-3 opacity-50" />
+                <p className="text-muted-foreground mb-4">No active academic period set</p>
+                <Link to="/admin/academic-periods">
+                  <Button size="sm">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Set Up Academic Period
+                  </Button>
+                </Link>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Stats Grid */}
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
