@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: localhost:3306
--- Generation Time: Nov 18, 2025 at 05:43 PM
+-- Generation Time: Nov 20, 2025 at 07:52 PM
 -- Server version: 8.4.3
 -- PHP Version: 8.3.26
 
@@ -48,12 +48,12 @@ INSERT INTO `academic_periods` (`id`, `school_year`, `semester`, `period_type`, 
 (17, '2024-2025', '1st Semester', 'Final Term', '2024-10-16', '2024-12-20', 'past', '2025-11-18 08:18:01', '2025-11-18 08:18:01'),
 (18, '2024-2025', '2nd Semester', 'Midterm', '2025-01-06', '2025-03-20', 'past', '2025-11-18 08:18:01', '2025-11-18 08:18:01'),
 (19, '2024-2025', '2nd Semester', 'Final Term', '2025-03-21', '2025-05-30', 'past', '2025-11-18 08:18:01', '2025-11-18 08:18:01'),
-(20, '2025-2026', '1st Semester', 'Midterm', '2025-08-01', '2025-10-15', 'past', '2025-11-18 08:18:01', '2025-11-18 08:52:55'),
-(21, '2025-2026', '1st Semester', 'Final Term', '2025-10-16', '2025-12-20', 'active', '2025-11-18 08:18:01', '2025-11-18 08:53:01'),
-(22, '2025-2026', '2nd Semester', 'Midterm', '2026-01-05', '2026-03-20', 'upcoming', '2025-11-18 08:18:01', '2025-11-18 08:18:01'),
-(23, '2025-2026', '2nd Semester', 'Final Term', '2026-03-21', '2026-05-29', 'upcoming', '2025-11-18 08:18:01', '2025-11-18 08:18:01'),
-(24, '2025-2026', 'Summer', 'Midterm', '2026-06-01', '2026-07-15', 'upcoming', '2025-11-18 08:18:01', '2025-11-18 08:18:01'),
-(25, '2025-2026', 'Summer', 'Final Term', '2026-07-16', '2026-07-31', 'upcoming', '2025-11-18 08:18:01', '2025-11-18 08:18:01');
+(20, '2025-2026', '1st Semester', 'Midterm', '2025-08-01', '2025-10-15', 'active', '2025-11-18 08:18:01', '2025-11-20 17:13:05'),
+(21, '2025-2026', '1st Semester', 'Final Term', '2025-10-16', '2025-12-20', 'past', '2025-11-18 08:18:01', '2025-11-20 17:13:05'),
+(22, '2025-2026', '2nd Semester', 'Midterm', '2026-01-05', '2026-03-20', 'past', '2025-11-18 08:18:01', '2025-11-20 17:12:57'),
+(23, '2025-2026', '2nd Semester', 'Final Term', '2026-03-21', '2026-05-29', 'past', '2025-11-18 08:18:01', '2025-11-20 17:12:57'),
+(24, '2025-2026', 'Summer', 'Midterm', '2026-06-01', '2026-07-15', 'past', '2025-11-18 08:18:01', '2025-11-20 17:12:57'),
+(25, '2025-2026', 'Summer', 'Final Term', '2026-07-16', '2026-07-31', 'past', '2025-11-18 08:18:01', '2025-11-20 17:12:57');
 
 -- --------------------------------------------------------
 
@@ -67,7 +67,7 @@ CREATE TABLE `activities` (
   `academic_period_id` int UNSIGNED DEFAULT NULL,
   `title` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `type` enum('assignment','quiz','exam','project','laboratory','performance','other') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'assignment',
-  `max_score` decimal(10,2) NOT NULL DEFAULT '100.00',
+  `max_score` int NOT NULL DEFAULT '100',
   `due_at` datetime DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `section_id` bigint UNSIGNED DEFAULT NULL
@@ -78,40 +78,40 @@ CREATE TABLE `activities` (
 --
 
 INSERT INTO `activities` (`id`, `course_id`, `academic_period_id`, `title`, `type`, `max_score`, `due_at`, `created_at`, `section_id`) VALUES
-(10, 6, 20, 'Quiz 1: Introduction to C# & .NET Framework', 'quiz', 50.00, '2025-08-15 00:00:00', '2025-11-18 01:31:41', 1),
-(11, 6, 20, 'Quiz 2: Data Types, Variables, and Operators', 'quiz', 50.00, '2025-11-18 00:00:00', '2025-11-18 01:31:58', 1),
-(12, 6, 20, 'Quiz 3: Control Structures (If/Else, Switch, Loops)', 'quiz', 50.00, '2025-11-18 00:00:00', '2025-11-18 01:32:24', 1),
-(13, 6, 20, 'Quiz 4: Arrays and Basic Methods', 'quiz', 50.00, '2025-11-18 00:00:00', '2025-11-18 01:32:34', 1),
-(14, 6, 20, 'Quiz 5: Object-Oriented Programming Concepts (Classes, Objects, Encapsulation)', 'quiz', 50.00, '2025-11-18 00:00:00', '2025-11-18 01:32:46', 1),
-(15, 6, 20, 'Assignment 1: Simple Calculator Console Application', 'assignment', 25.00, '2025-11-18 00:00:00', '2025-11-18 01:33:00', 1),
-(16, 6, 20, 'Assignment 2: Student Grade Management System (Console)', 'assignment', 25.00, '2025-11-18 00:00:00', '2025-11-18 01:33:19', 1),
-(17, 6, 20, 'Project: Make a System using Windows Forms', 'project', 100.00, '2025-11-18 00:00:00', '2025-11-18 01:33:57', 1),
-(18, 6, 20, 'Lab 1: Setting up Visual Studio and Writing Your First \"Hello World\" Program', 'laboratory', 100.00, '2025-11-18 00:00:00', '2025-11-18 01:34:17', 1),
-(19, 6, 20, 'Lab 2: Working with Strings and User Input', 'laboratory', 100.00, '2025-11-18 00:00:00', '2025-11-18 01:34:30', 1),
-(20, 6, 20, 'Lab 3: Implementing Conditional Logic with If/Else and Switch Statements', 'laboratory', 100.00, '2025-11-18 00:00:00', '2025-11-18 01:34:45', 1),
-(21, 6, 20, 'Lab 4: Mastering Loops (For, While, Do-While) through Number Patterns', 'laboratory', 100.00, '2025-11-18 00:00:00', '2025-11-18 01:34:56', 1),
-(22, 6, 20, 'Lab 5: Creating and Manipulating One-Dimensional Arrays', 'laboratory', 100.00, '2025-11-18 00:00:00', '2025-11-18 01:35:08', 1),
-(23, 6, 20, 'Lab 6: Building Classes and Objects for a Simple Bank Account System', 'laboratory', 100.00, '2025-11-18 00:00:00', '2025-11-18 01:35:20', 1),
-(24, 6, 20, 'Lab 7: File Handling - Reading and Writing Data to Text Files', 'laboratory', 100.00, '2025-11-18 00:00:00', '2025-11-18 01:35:32', 1),
-(25, 6, 20, 'Performance Task 1: Recitation on Data Types and Variable Declaration', 'performance', 100.00, '2025-11-18 00:00:00', '2025-11-18 01:35:45', 1),
-(26, 6, 20, 'Performance Task 2: Code Walkthrough - Explaining a Loop Structure', 'performance', 100.00, '2025-11-18 00:00:00', '2025-11-18 01:35:57', 1),
-(27, 6, 20, 'Performance Task 3: Presentation of Project Design and UML Diagrams', 'performance', 100.00, '2025-11-18 00:00:00', '2025-11-18 01:36:11', 1),
-(28, 6, 20, 'Midterm Exam', 'exam', 100.00, '2025-11-18 00:00:00', '2025-11-18 01:37:56', 1),
-(29, 6, 21, 'Quiz 6: Advanced OOP - Inheritance and Polymorphism', 'quiz', 50.00, '2025-11-18 00:00:00', '2025-11-18 01:53:23', 1),
-(30, 6, 21, 'Quiz 7: Exception Handling and Debugging', 'quiz', 50.00, '2025-11-18 00:00:00', '2025-11-18 01:53:36', 1),
-(31, 6, 21, 'Quiz 8: Working with Collections (Lists, Dictionaries)', 'quiz', 50.00, '2025-11-18 00:00:00', '2025-11-18 01:53:48', 1),
-(32, 6, 21, 'Quiz 9: Introduction to Windows Forms (Event-Driven Programming)', 'quiz', 50.00, '2025-11-18 00:00:00', '2025-11-18 01:54:05', 1),
-(33, 6, 21, 'Quiz 10: File I/O and Data Persistence', 'quiz', 50.00, '2025-11-18 00:00:00', '2025-11-18 01:54:16', 1),
-(34, 6, 21, 'Assignment 3: Inventory Management System (Console Application)', 'assignment', 25.00, '2025-11-18 00:00:00', '2025-11-18 01:54:31', 1),
-(35, 6, 21, 'Assignment 4: Simple Banking System with Inheritance', 'assignment', 25.00, '2025-11-18 00:00:00', '2025-11-18 01:54:41', 1),
-(36, 6, 21, 'Assignment 5: Text File Analyzer (Word Count, Line Count)', 'assignment', 25.00, '2025-11-18 00:00:00', '2025-11-18 01:54:51', 1),
-(37, 6, 21, 'Lab 8: Implementing Inheritance and Method Overriding', 'laboratory', 100.00, '2025-11-18 00:00:00', '2025-11-18 01:55:02', 1),
-(38, 6, 21, 'Lab 9: Building a Windows Form for User Input', 'laboratory', 100.00, '2025-11-18 00:00:00', '2025-11-18 01:55:14', 1),
-(39, 6, 21, 'Lab 10: Connecting a Windows Form to a Backend Class', 'laboratory', 100.00, '2025-11-18 00:00:00', '2025-11-18 01:55:26', 1),
-(40, 6, 21, 'Lab 11: Using Generic Collections (List<T>, Dictionary<TKey, TValue>)', 'laboratory', 100.00, '2025-11-18 00:00:00', '2025-11-18 01:56:07', 1),
-(41, 6, 21, 'Lab 12: Reading and Writing JSON Files', 'laboratory', 100.00, '2025-11-18 00:00:00', '2025-11-18 01:56:21', 1),
-(42, 6, 21, 'Final Project: Student Information System (Windows Forms)', 'project', 100.00, '2025-11-18 00:00:00', '2025-11-18 01:56:43', 1),
-(43, 6, 21, 'Final Exam', 'exam', 100.00, '2025-11-18 00:00:00', '2025-11-18 01:56:56', 1);
+(10, 6, 20, 'Quiz 1: Introduction to C# & .NET Framework', 'quiz', 50, '2025-08-15 00:00:00', '2025-11-18 01:31:41', 1),
+(11, 6, 20, 'Quiz 2: Data Types, Variables, and Operators', 'quiz', 50, '2025-11-18 00:00:00', '2025-11-18 01:31:58', 1),
+(12, 6, 20, 'Quiz 3: Control Structures (If/Else, Switch, Loops)', 'quiz', 50, '2025-11-18 00:00:00', '2025-11-18 01:32:24', 1),
+(13, 6, 20, 'Quiz 4: Arrays and Basic Methods', 'quiz', 50, '2025-11-18 00:00:00', '2025-11-18 01:32:34', 1),
+(14, 6, 20, 'Quiz 5: Object-Oriented Programming Concepts (Classes, Objects, Encapsulation)', 'quiz', 50, '2025-11-18 00:00:00', '2025-11-18 01:32:46', 1),
+(15, 6, 20, 'Assignment 1: Simple Calculator Console Application', 'assignment', 25, '2025-11-18 00:00:00', '2025-11-18 01:33:00', 1),
+(16, 6, 20, 'Assignment 2: Student Grade Management System (Console)', 'assignment', 25, '2025-11-18 00:00:00', '2025-11-18 01:33:19', 1),
+(17, 6, 20, 'Project: Make a System using Windows Forms', 'project', 100, '2025-11-18 00:00:00', '2025-11-18 01:33:57', 1),
+(18, 6, 20, 'Lab 1: Setting up Visual Studio and Writing Your First \"Hello World\" Program', 'laboratory', 100, '2025-11-18 00:00:00', '2025-11-18 01:34:17', 1),
+(19, 6, 20, 'Lab 2: Working with Strings and User Input', 'laboratory', 100, '2025-11-18 00:00:00', '2025-11-18 01:34:30', 1),
+(20, 6, 20, 'Lab 3: Implementing Conditional Logic with If/Else and Switch Statements', 'laboratory', 100, '2025-11-18 00:00:00', '2025-11-18 01:34:45', 1),
+(21, 6, 20, 'Lab 4: Mastering Loops (For, While, Do-While) through Number Patterns', 'laboratory', 100, '2025-11-18 00:00:00', '2025-11-18 01:34:56', 1),
+(22, 6, 20, 'Lab 5: Creating and Manipulating One-Dimensional Arrays', 'laboratory', 100, '2025-11-18 00:00:00', '2025-11-18 01:35:08', 1),
+(23, 6, 20, 'Lab 6: Building Classes and Objects for a Simple Bank Account System', 'laboratory', 100, '2025-11-18 00:00:00', '2025-11-18 01:35:20', 1),
+(24, 6, 20, 'Lab 7: File Handling - Reading and Writing Data to Text Files', 'laboratory', 100, '2025-11-18 00:00:00', '2025-11-18 01:35:32', 1),
+(25, 6, 20, 'Performance Task 1: Recitation on Data Types and Variable Declaration', 'performance', 100, '2025-11-18 00:00:00', '2025-11-18 01:35:45', 1),
+(26, 6, 20, 'Performance Task 2: Code Walkthrough - Explaining a Loop Structure', 'performance', 100, '2025-11-18 00:00:00', '2025-11-18 01:35:57', 1),
+(27, 6, 20, 'Performance Task 3: Presentation of Project Design and UML Diagrams', 'performance', 100, '2025-11-18 00:00:00', '2025-11-18 01:36:11', 1),
+(28, 6, 20, 'Midterm Exam', 'exam', 100, '2025-11-18 00:00:00', '2025-11-18 01:37:56', 1),
+(29, 6, 21, 'Quiz 6: Advanced OOP - Inheritance and Polymorphism', 'quiz', 50, '2025-11-18 00:00:00', '2025-11-18 01:53:23', 1),
+(30, 6, 21, 'Quiz 7: Exception Handling and Debugging', 'quiz', 50, '2025-11-18 00:00:00', '2025-11-18 01:53:36', 1),
+(31, 6, 21, 'Quiz 8: Working with Collections (Lists, Dictionaries)', 'quiz', 50, '2025-11-18 00:00:00', '2025-11-18 01:53:48', 1),
+(32, 6, 21, 'Quiz 9: Introduction to Windows Forms (Event-Driven Programming)', 'quiz', 50, '2025-11-18 00:00:00', '2025-11-18 01:54:05', 1),
+(33, 6, 21, 'Quiz 10: File I/O and Data Persistence', 'quiz', 50, '2025-11-18 00:00:00', '2025-11-18 01:54:16', 1),
+(34, 6, 21, 'Assignment 3: Inventory Management System (Console Application)', 'assignment', 25, '2025-11-18 00:00:00', '2025-11-18 01:54:31', 1),
+(35, 6, 21, 'Assignment 4: Simple Banking System with Inheritance', 'assignment', 25, '2025-11-18 00:00:00', '2025-11-18 01:54:41', 1),
+(36, 6, 21, 'Assignment 5: Text File Analyzer (Word Count, Line Count)', 'assignment', 25, '2025-11-18 00:00:00', '2025-11-18 01:54:51', 1),
+(37, 6, 21, 'Lab 8: Implementing Inheritance and Method Overriding', 'laboratory', 100, '2025-11-18 00:00:00', '2025-11-18 01:55:02', 1),
+(38, 6, 21, 'Lab 9: Building a Windows Form for User Input', 'laboratory', 100, '2025-11-18 00:00:00', '2025-11-18 01:55:14', 1),
+(39, 6, 21, 'Lab 10: Connecting a Windows Form to a Backend Class', 'laboratory', 100, '2025-11-18 00:00:00', '2025-11-18 01:55:26', 1),
+(40, 6, 21, 'Lab 11: Using Generic Collections (List<T>, Dictionary<TKey, TValue>)', 'laboratory', 100, '2025-11-18 00:00:00', '2025-11-18 01:56:07', 1),
+(41, 6, 21, 'Lab 12: Reading and Writing JSON Files', 'laboratory', 100, '2025-11-18 00:00:00', '2025-11-18 01:56:21', 1),
+(42, 6, 21, 'Final Project: Student Information System (Windows Forms)', 'project', 100, '2025-11-18 00:00:00', '2025-11-18 01:56:43', 1),
+(43, 6, 21, 'Final Exam', 'exam', 100, '2025-11-18 00:00:00', '2025-11-18 01:56:56', 1);
 
 -- --------------------------------------------------------
 
@@ -532,7 +532,50 @@ INSERT INTO `activity_grades` (`id`, `activity_id`, `student_id`, `grade`, `stat
 (436, 14, 347, 44, 'Pending', '2025-11-18 08:47:46', '2025-11-18 08:47:46'),
 (437, 13, 347, 43, 'Pending', '2025-11-18 08:47:46', '2025-11-18 08:47:46'),
 (438, 12, 347, 42, 'Pending', '2025-11-18 08:47:46', '2025-11-18 08:47:46'),
-(439, 11, 347, 40, 'Pending', '2025-11-18 08:47:46', '2025-11-18 08:47:46');
+(439, 11, 347, 40, 'Pending', '2025-11-18 08:47:46', '2025-11-18 08:47:46'),
+(573, 29, 93, 50, 'Pending', '2025-11-19 00:56:20', '2025-11-19 00:56:20'),
+(574, 30, 93, 45, 'Pending', '2025-11-19 00:56:23', '2025-11-19 00:56:23'),
+(575, 31, 93, 46, 'Pending', '2025-11-19 00:56:25', '2025-11-19 00:56:25'),
+(576, 32, 93, 45, 'Pending', '2025-11-19 00:56:27', '2025-11-19 00:56:27');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `attendance`
+--
+
+CREATE TABLE `attendance` (
+  `id` int NOT NULL,
+  `student_id` int NOT NULL,
+  `teacher_id` int NOT NULL,
+  `course_id` int NOT NULL,
+  `status` enum('present','late','absent','out_of_range') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'present',
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `campus`
+--
+
+CREATE TABLE `campus` (
+  `id` int NOT NULL,
+  `name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `address` varchar(512) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `latitude` decimal(10,7) NOT NULL,
+  `longitude` decimal(10,7) NOT NULL,
+  `geo_radius_m` int NOT NULL DEFAULT '50',
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `campus`
+--
+
+INSERT INTO `campus` (`id`, `name`, `address`, `latitude`, `longitude`, `geo_radius_m`, `created_at`, `updated_at`) VALUES
+(1, 'Mindoro State University', 'Masipit, Calapan City, Oriental Mindoro', 13.3880969, 121.1622968, 200, '2025-11-20 12:26:33', '2025-11-20 12:35:42');
 
 -- --------------------------------------------------------
 
@@ -1209,10 +1252,10 @@ CREATE TABLE `users` (
 INSERT INTO `users` (`id`, `email`, `password`, `role`, `first_name`, `last_name`, `phone`, `status`, `created_at`, `updated_at`) VALUES
 (1, 'student@demo.com', '$2y$10$Ll4dzxFoqlaGCC1aL702BOdZ3xtLLijHcLKzW4SF1HPrlEgP9Frz6', 'student', 'Demo', 'Student', '', 'active', '2025-11-06 11:13:56', '2025-11-10 01:05:04'),
 (2, 'teacher@demo.com', '$2y$10$/zuE1Q4AmA1J6MXuovoRoenUL5PoblPSzSxXA3ubUw47wpiTNfoVS', 'teacher', 'Demo', 'Teacher', '', 'active', '2025-11-06 11:14:42', '2025-11-10 01:59:57'),
-(3, 'admin@demo.com', '$2y$10$zhZ636k.0buTfPYR..Q2eODPgdmjEcKklTOWC1HTR64BH13j0iNeS', 'admin', 'Demo', 'Admin', '', 'active', '2025-11-06 11:15:04', '2025-11-18 08:35:16'),
+(3, 'admin@demo.com', '$2y$10$zhZ636k.0buTfPYR..Q2eODPgdmjEcKklTOWC1HTR64BH13j0iNeS', 'admin', 'Demo', 'Admin', '', 'active', '2025-11-06 11:15:04', '2025-11-20 11:59:46'),
 (16, 'john.doe@example.com', '$2y$10$I19hzyUWwzkG9HMk8wEutekUr7tC9GmtiRFvW4lqePlq4eKBKXQtS', 'teacher', 'John', 'Doe', '', 'active', '2025-11-06 14:05:34', '2025-11-06 18:29:13'),
 (18, 'juan.delacruz@mcc.edu.ph', '$2y$10$762nxMWoGHGu7kRyvzc8K.FGrrYGGJpRdMbm5jentTkF4mfui3iBK', 'student', 'Juan', 'Dela Cruz', '', 'active', '2025-11-06 18:30:24', '2025-11-06 18:30:24'),
-(19, 'maria.santos@mcc.edu.ph', '$2y$10$KGlfA0PiOWB4HR0pds9.1epVHMzpgv3hsk.qLKXZCSh9mgaD20FCW', 'student', 'Maria', 'Santos', '', 'active', '2025-11-06 18:30:45', '2025-11-06 11:48:51'),
+(19, 'maria.santos@mcc.edu.ph', '$2y$10$KGlfA0PiOWB4HR0pds9.1epVHMzpgv3hsk.qLKXZCSh9mgaD20FCW', 'student', 'Maria', 'Santos', '', 'active', '2025-11-06 18:30:45', '2025-11-20 12:48:08'),
 (21, 'jose.reyes@mcc.edu.ph', '$2y$10$a6oQ6s6.ZLrnMN2ShismvunFw6HSUJb/lrIcxQfhLfHp2HWc2W7xK', 'teacher', 'Jose', 'Reyes', '', 'active', '2025-11-08 16:18:01', '2025-11-08 16:18:01'),
 (23, 'ana.bautista@mcc.edu.ph', '$2y$10$Jj6j4oDteBovsiSxQ5M2juwj3pExJM5R80gRSCnWB40b8csyWQhHW', 'student', 'Ana Marie', 'Bautista', '', 'active', '2025-11-10 08:39:01', '2025-11-10 08:39:01'),
 (24, 'carlos.mendoza@mcc.edu.ph', '$2y$10$XjdtGF0u5jkv3wbYlJm4D.Np7Cv9hDp7Of/zlEv7Bt5D2GHtWugQe', 'student', 'Carlos', 'Mendoza', '', 'active', '2025-11-10 08:39:16', '2025-11-10 08:39:16'),
@@ -1228,7 +1271,7 @@ INSERT INTO `users` (`id`, `email`, `password`, `role`, `first_name`, `last_name
 (34, 'samantha.lopez@mcc.edu.ph', '$2y$10$shoW7DnaD2eOcoSkosYGH.xkPvqIoCuRqwtCm7NjU9s/iaeR/I5Ge', 'student', 'Samantha', 'Lopez', '', 'active', '2025-11-10 08:41:39', '2025-11-10 08:41:39'),
 (35, 'rafael.valdez@mcc.edu.ph', '$2y$10$sbcy6wENv1x.LIJTV85iNOFIG7LvUTB63hL9Xb8BvmZ0ojEB22XgC', 'student', 'Rafael Paolo', 'Valdez', '', 'active', '2025-11-10 08:42:03', '2025-11-10 08:42:03'),
 (36, 'nicole.villanueva@mcc.edu.ph', '$2y$10$KNVaAGgtjnMrdPX92/Uv7.p7GEalZLUmfhu7ws1jc6At7/RXX6N6S', 'student', 'Nicole Ann', 'Villanueva', '', 'active', '2025-11-10 08:42:15', '2025-11-10 08:42:15'),
-(37, 'adrian.co@mcc.edu.ph', '$2y$10$4s0/H8yNcei4d6sX5S8Jb.ZoESlPMGGlDRDMCfMSeVUen1j7BqxCG', 'student', 'Adrian James', 'Co', '', 'active', '2025-11-10 08:42:29', '2025-11-10 08:42:29'),
+(37, 'adrian.co@mcc.edu.ph', '$2y$10$4s0/H8yNcei4d6sX5S8Jb.ZoESlPMGGlDRDMCfMSeVUen1j7BqxCG', 'student', 'Adrian James', 'Co', '', 'active', '2025-11-10 08:42:29', '2025-11-19 03:11:39'),
 (38, 'tricia.balingit@mcc.edu.ph', '$2y$10$cac/8cufGbKTeVh45ItQiuhIefWl3POl0evpDR1V/1p7f8bCXRYu6', 'student', 'Tricia Mae', 'Balingit', '', 'active', '2025-11-10 08:42:43', '2025-11-10 08:42:43'),
 (39, 'johnlloyd.cruz@mcc.edu.ph', '$2y$10$FdX0lIglHbOsVzWVdcLn7u6wJccWMJq8eG.nHqAXnnId8Ed63ox/O', 'student', 'John Lloyd', 'Cruz', '', 'active', '2025-11-10 08:42:56', '2025-11-10 08:42:56'),
 (40, 'andrea.reyes@mcc.edu.ph', '$2y$10$go/31KlI0JlS.l2Y32vvreimnJ7pdTwVx9svuuoGpjtyKg038IG92', 'student', 'Andrea', 'Reyes', '', 'active', '2025-11-10 08:46:11', '2025-11-10 08:46:11'),
@@ -1243,7 +1286,7 @@ INSERT INTO `users` (`id`, `email`, `password`, `role`, `first_name`, `last_name
 (49, 'jake.silva@mcc.edu.ph', '$2y$10$KkoQ0Kd5xJgW5f653dpUiOcCyZbZYuZwMRKxzW9Mhq05np6P25mvu', 'student', 'Jake Anthony', 'Silva', '', 'active', '2025-11-10 08:47:32', '2025-11-10 08:47:32'),
 (50, 'kaye.castro@mcc.edu.ph', '$2y$10$E5sxDNYuS7PQPqFEdcdqcupccfatEk39MJsK7LNx0ujWmpNwocPWy', 'student', 'Kaye', 'Castro', '', 'active', '2025-11-10 08:47:40', '2025-11-10 08:47:40'),
 (51, 'leandro.morales@mcc.edu.ph', '$2y$10$icTlD1gFj.SReFcPhM./bec13jp9ru0KFZlfEChhE4zpue7Mzz4CW', 'student', 'Leandro', 'Morales', '', 'active', '2025-11-10 09:21:56', '2025-11-10 09:21:56'),
-(52, 'mia.dizon@mcc.edu.ph', '$2y$10$EtWI1tGPBY9GmYYBuVs1lOSVTSe7XTi4fli2mEDeXH4xrTTo8lQ/e', 'teacher', 'Mia Rose', 'Dizon', '', 'active', '2025-11-10 09:38:20', '2025-11-18 05:04:57'),
+(52, 'mia.dizon@mcc.edu.ph', '$2y$10$EtWI1tGPBY9GmYYBuVs1lOSVTSe7XTi4fli2mEDeXH4xrTTo8lQ/e', 'teacher', 'Mia Rose', 'Dizon', '', 'active', '2025-11-10 09:38:20', '2025-11-19 07:18:10'),
 (53, 'nico.perez@mcc.edu.ph', '$2y$10$m.hi3cAvdrAUzCF7TMoaseMCqY.oGHNorWf7U4e1.IXkR7ANud61S', 'student', 'Nico Allan', 'Perez', '', 'active', '2025-11-10 09:46:50', '2025-11-10 09:46:50'),
 (54, 'olivia.delgado@mcc.edu.ph', '$2y$10$0h4mahiMCDm96OWctcRdXeujn7Yr/PRJvgyO7KQtO954d7V39.26m', 'student', 'Olivia Anne', 'Delgado', NULL, 'active', '2025-11-10 12:04:08', '2025-11-10 19:04:08'),
 (55, 'paul.uy@mcc.edu.ph', '$2y$10$8IsNfV4is0Sgs0N6e70Zk.PP.DcSJswNe.GBdLa3aLZhDxvJ.KiZG', 'student', 'Paul Vincent', 'Uy', NULL, 'active', '2025-11-10 12:04:08', '2025-11-10 19:04:08'),
@@ -1301,7 +1344,7 @@ INSERT INTO `users` (`id`, `email`, `password`, `role`, `first_name`, `last_name
 (107, 'yara.malonzo@mcc.edu.ph', '$2y$10$oJSjMflWYI2WHCutruB4iO.HflHnYW4oYmh7e4X7BzKJ4uewlaJs.', 'student', 'Yara Nicole', 'Malonzo', NULL, 'active', '2025-11-10 12:15:42', '2025-11-10 19:15:42'),
 (108, 'zeke.noble@mcc.edu.ph', '$2y$10$Do.MIHhKjzqTsd8N9rU.Nekp2W2JzIz/QLVCRi3.CJSf70CJSksr6', 'student', 'Zeke Daniel', 'Noble', NULL, 'active', '2025-11-10 12:15:42', '2025-11-10 19:15:42'),
 (109, 'abigail.pineda@mcc.edu.ph', '$2y$10$Nl81BwhhufU0cKkd3yOfA.bbRUkcgfXb/NJJ6Bo4x8xAZkzMzOtpq', 'student', 'Abigail Rose', 'Pineda', NULL, 'active', '2025-11-10 12:15:42', '2025-11-10 19:15:42'),
-(110, 'ana.ortega@mcc.edu.ph', '$2y$10$9ZltQzA4BL8oxrhx7FU5S.Y58EGi7b8/a50kwKF55SdgDHLc1YDza', 'student', 'Ana', 'Ortega', NULL, 'active', '2025-11-10 12:30:35', '2025-11-10 19:30:35'),
+(110, 'ana.ortega@mcc.edu.ph', '$2y$10$9ZltQzA4BL8oxrhx7FU5S.Y58EGi7b8/a50kwKF55SdgDHLc1YDza', 'student', 'Ana', 'Ortega', NULL, 'active', '2025-11-10 12:30:35', '2025-11-19 05:23:55'),
 (111, 'ricardo.lim@mcc.edu.ph', '$2y$10$oO3esbnhLoSBMVVAEpi/5.oT2SZ4ht0cj1N1Bpg/Nug.hAicPeL/m', 'student', 'Ricardo', 'Lim', NULL, 'active', '2025-11-10 12:30:35', '2025-11-10 19:30:35'),
 (112, 'diego.alvarez@mcc.edu.ph', '$2y$10$RzvrH2OmfCYy8g5rf9YNuu/0eIfT0qnWWPwxU6A3x38lBR7r.QVE.', 'student', 'Diego', 'Alvarez', NULL, 'active', '2025-11-10 12:30:35', '2025-11-10 19:30:35'),
 (113, 'julian.sy@mcc.edu.ph', '$2y$10$//yUsNWHi4oBimdkncqP0uhb0MgunJa4PDtINSAPbFT6S152uVm66', 'student', 'Julian', 'Sy', NULL, 'active', '2025-11-10 12:30:35', '2025-11-10 19:30:35'),
@@ -1676,6 +1719,21 @@ ALTER TABLE `activity_grades`
   ADD KEY `idx_ag_student` (`student_id`);
 
 --
+-- Indexes for table `attendance`
+--
+ALTER TABLE `attendance`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_att_student` (`student_id`),
+  ADD KEY `idx_att_teacher` (`teacher_id`),
+  ADD KEY `idx_att_course` (`course_id`);
+
+--
+-- Indexes for table `campus`
+--
+ALTER TABLE `campus`
+  ADD PRIMARY KEY (`id`);
+
+--
 -- Indexes for table `password_resets`
 --
 ALTER TABLE `password_resets`
@@ -1787,7 +1845,19 @@ ALTER TABLE `activities`
 -- AUTO_INCREMENT for table `activity_grades`
 --
 ALTER TABLE `activity_grades`
-  MODIFY `id` bigint UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=573;
+  MODIFY `id` bigint UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=577;
+
+--
+-- AUTO_INCREMENT for table `attendance`
+--
+ALTER TABLE `attendance`
+  MODIFY `id` int NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `campus`
+--
+ALTER TABLE `campus`
+  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
 -- AUTO_INCREMENT for table `password_resets`
