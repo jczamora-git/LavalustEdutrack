@@ -386,6 +386,55 @@ class ActivityController extends Controller
     }
 
     /**
+     * Generic query for activity_grades
+     * GET /api/activity-grades?activity_id=123&student_id=45
+     * Returns grade rows filtered by activity_id and/or student_id
+     */
+    public function api_get_activity_grades_by_params()
+    {
+        api_set_json_headers();
+
+        if (!$this->session->userdata('logged_in')) {
+            http_response_code(401);
+            echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+            return;
+        }
+
+        try {
+            $activityId = isset($_GET['activity_id']) ? (int)$_GET['activity_id'] : null;
+            $studentId = isset($_GET['student_id']) ? (int)$_GET['student_id'] : null;
+
+            if (!$activityId && !$studentId) {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'message' => 'At least one filter required: activity_id or student_id']);
+                return;
+            }
+
+            $sql = "SELECT * FROM activity_grades WHERE 1=1";
+            $params = [];
+
+            if ($activityId) {
+                $sql .= " AND activity_id = ?";
+                $params[] = $activityId;
+            }
+            if ($studentId) {
+                $sql .= " AND student_id = ?";
+                $params[] = $studentId;
+            }
+
+            $sql .= " ORDER BY id DESC";
+
+            $stmt = $this->db->raw($sql, $params);
+            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            echo json_encode(['success' => true, 'data' => $rows, 'count' => is_array($rows) ? count($rows) : 0]);
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'message' => 'Server error: ' . $e->getMessage()]);
+        }
+    }
+
+    /**
      * Input / Update grade for a student on an activity (teacher only)
      * POST /api/activities/{id}/grades
      * Body: { student_id, grade, status }

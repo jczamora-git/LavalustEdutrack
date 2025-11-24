@@ -128,61 +128,161 @@ const CourseGradeDetail = () => {
         const periodsRes = await apiGet(API_ENDPOINTS.ACADEMIC_PERIODS);
         const periods = Array.isArray(periodsRes) ? periodsRes : (periodsRes.data || []);
 
-        // 3) Get teacher assignments (courses) for this student
-        const assignmentsRes = await apiGet(
-          `${API_ENDPOINTS.TEACHER_ASSIGNMENTS_FOR_STUDENT}?section_id=${sectionId}`
-        );
-        const assignments = Array.isArray(assignmentsRes) ? assignmentsRes : (assignmentsRes.data || assignmentsRes.assignments || []);
-
-        // Find the course we're viewing - courseId could be teacher assignment ID or subject ID
-        let courseAssignment = assignments.find((a: any) => 
-          String(a?.id) === String(courseId) || 
-          String(a?.teacher_subject_id) === String(courseId) ||
-          String(a?.subject_id) === String(courseId)
-        );
-
-        if (!courseAssignment) {
-          console.error("Course assignment not found for this student", courseId, assignments);
-          setLoading(false);
-          return;
+        // 3) Prefer fetching the subject by id directly when the route param is a subject id
+        let subjectId: any = null;
+        let subject: any = null;
+        try {
+          const subjectUrl = API_ENDPOINTS.SUBJECT_BY_ID(courseId);
+          console.debug('[CourseGradeDetail] Fetching subject by id:', subjectUrl);
+          const trySubject = await apiGet(subjectUrl);
+          console.debug('[CourseGradeDetail] SUBJECT response:', trySubject);
+          const s = trySubject?.data || trySubject?.subject || trySubject || null;
+          if (s && (s.id || s.course_name)) {
+            subjectId = s.id ?? courseId;
+            subject = s;
+          }
+        } catch (err) {
+          console.warn('[CourseGradeDetail] SUBJECT fetch failed, will resolve via assignments:', err);
         }
 
-        // Get subject_id (activities.course_id uses subject_id, not teacher_subject_id!)
-        const subjectId = courseAssignment.subject_id || courseAssignment.subject?.id;
+        // If subject wasn't found directly, fall back to teacher assignments for this student's section
+        let courseAssignment: any = null;
+        if (!subjectId) {
+          const taUrl = `${API_ENDPOINTS.TEACHER_ASSIGNMENTS_FOR_STUDENT}?section_id=${sectionId}`;
+          console.debug('[CourseGradeDetail] Fetching teacher assignments for student section:', taUrl);
+          const assignmentsRes = await apiGet(taUrl);
+          console.debug('[CourseGradeDetail] TEACHER_ASSIGNMENTS response:', assignmentsRes);
+          const assignments = Array.isArray(assignmentsRes) ? assignmentsRes : (assignmentsRes.data || assignmentsRes.assignments || []);
 
-        // Get subject details to find course title
-        let subjectRes: any = null;
-        if (subjectId) {
-          subjectRes = await apiGet(API_ENDPOINTS.SUBJECT_BY_ID(subjectId));
+          // Find the course we're viewing - courseId could be teacher assignment ID or subject ID
+          courseAssignment = assignments.find((a: any) =>
+            String(a?.id) === String(courseId) ||
+            String(a?.teacher_subject_id) === String(courseId) ||
+            String(a?.subject_id) === String(courseId)
+          );
+
+          if (!courseAssignment) {
+            console.error("Course assignment not found for this student", courseId, assignments);
+            setLoading(false);
+            return;
+          }
+
+          // Get subject_id (activities.course_id uses subject_id, not teacher_subject_id!)
+          subjectId = courseAssignment.subject_id || courseAssignment.subject?.id;
+
+          // Get subject details to find course title
+          let subjectRes: any = null;
+          if (subjectId) {
+            subjectRes = await apiGet(API_ENDPOINTS.SUBJECT_BY_ID(subjectId));
+          }
+          subject = subjectRes?.data || subjectRes?.subject || subjectRes || (courseAssignment.subject || {});
+
+          // subject and courseAssignment are now set (courseAssignment may be null)
         }
-        const subject = subjectRes?.data || subjectRes?.subject || subjectRes || (courseAssignment.subject || {});
 
-        const teacher = courseAssignment.teacher || courseAssignment.teacher_info || {};
-        const teacherName = teacher.first_name && teacher.last_name
-          ? `${teacher.first_name} ${teacher.last_name}`
-          : courseAssignment.teacher_name || "Unknown";
+        // Determine teacher name (prefer courseAssignment teacher info if available)
+        let teacherName = 'TBA';
+        if (courseAssignment) {
+          const t = courseAssignment.teacher || courseAssignment.teacher_info || {};
+          teacherName = t.first_name && t.last_name ? `${t.first_name} ${t.last_name}` : (courseAssignment.teacher_name || 'Unknown');
+        }
 
+        // Finally set course info once
         setCourseInfo({
-          title: subject?.course_name || subject?.title || courseAssignment.title || "Course",
-          code: subject?.course_code || subject?.code || "---",
+          title: subject?.course_name || subject?.title || (courseAssignment?.title ?? 'Course'),
+          code: subject?.course_code || subject?.code || (courseAssignment?.course_code ?? '---'),
           teacher: teacherName,
           courseId: subjectId
         });
 
+        // If teacher not available, attempt to fetch teacher assignment for this subject+section
+        if ((teacherName === 'TBA' || teacherName === 'Unknown') && subjectId && sectionId) {
+          try {
+            const taUrl = `${API_ENDPOINTS.TEACHER_ASSIGNMENTS_FOR_STUDENT}?section_id=${sectionId}&subject_id=${subjectId}`;
+            const taRes = await apiGet(taUrl);
+            const taList = Array.isArray(taRes) ? taRes : (taRes.assignments || taRes.data || taRes || []);
+            const ta = Array.isArray(taList) && taList.length > 0 ? taList[0] : null;
+            if (ta) {
+              let fetchedTeacherName = null;
+              if (ta.teacher) {
+                const t = ta.teacher;
+                if (t.first_name && t.last_name) fetchedTeacherName = `${t.first_name} ${t.last_name}`;
+              }
+              // fallback: if teacher_id present, fetch public teacher info
+              if (!fetchedTeacherName && ta.teacher_id) {
+                try {
+                  const pub = await apiGet(API_ENDPOINTS.TEACHER_BY_ID_PUBLIC(ta.teacher_id));
+                  const tpub = pub.data || pub.teacher || pub || null;
+                  if (tpub && (tpub.first_name || tpub.last_name)) {
+                    fetchedTeacherName = `${tpub.first_name ?? ''} ${tpub.last_name ?? ''}`.trim();
+                  }
+                } catch (e) {
+                  // ignore
+                }
+              }
+
+              if (fetchedTeacherName) {
+                setCourseInfo((prev: any) => ({ ...prev, teacher: fetchedTeacherName }));
+              }
+            }
+          } catch (e) {
+            // ignore failure to fetch teacher assignment
+          }
+        }
+
         // 4) OPTIMIZED: Fetch ALL activities WITH grades for this course in ONE request
+        // Try using the route param `courseId` first (the id user navigated with). If no activities
+        // are returned, fall back to the resolved `subjectId` (teacher assignment resolution).
         let activitiesWithGrades: any[] = [];
-        try {
-          const bulkRes = await apiGet(
-            `${API_ENDPOINTS.ACTIVITIES_STUDENT_GRADES}?course_id=${subjectId}&student_id=${student.id}${sectionId ? `&section_id=${sectionId}` : ''}`
-          );
-          activitiesWithGrades = bulkRes.data || bulkRes || [];
-        } catch (err) {
-          console.error('Failed to fetch activities with grades, falling back to old method:', err);
-          // Fallback: fetch without grades
-          const activitiesRes = await apiGet(
-            `${API_ENDPOINTS.ACTIVITIES}?course_id=${subjectId}${sectionId ? `&section_id=${sectionId}` : ''}`
-          );
-          activitiesWithGrades = activitiesRes.data || activitiesRes || [];
+        const tryCourseIds = [courseId, subjectId].filter((v) => v !== undefined && v !== null && v !== '').map(String);
+        for (const cid of tryCourseIds) {
+          try {
+            const url = `${API_ENDPOINTS.ACTIVITIES_STUDENT_GRADES}?course_id=${encodeURIComponent(cid)}&student_id=${student.id}${sectionId ? `&section_id=${sectionId}` : ''}`;
+            console.debug('[CourseGradeDetail] Trying activities/student-grades with:', url);
+            const bulkRes = await apiGet(url);
+            console.debug('[CourseGradeDetail] ACTIVITIES_STUDENT_GRADES response for', cid, bulkRes);
+            const rows = bulkRes.data || bulkRes || [];
+            if (Array.isArray(rows) && rows.length > 0) {
+              activitiesWithGrades = rows;
+              break;
+            }
+          } catch (err) {
+            console.warn('[CourseGradeDetail] activities/student-grades fetch failed for', cid, err);
+            // ignore and try next id
+          }
+        }
+
+        // If still empty, try fetching activities without embedded grades and then fetch per-activity grades
+        if ((!activitiesWithGrades || activitiesWithGrades.length === 0) && subjectId) {
+          try {
+            const activitiesUrl = `${API_ENDPOINTS.ACTIVITIES}?course_id=${encodeURIComponent(subjectId)}${sectionId ? `&section_id=${sectionId}` : ''}`;
+            console.debug('[CourseGradeDetail] Fetching activities fallback:', activitiesUrl);
+            const activitiesRes = await apiGet(activitiesUrl);
+            const acts = activitiesRes.data || activitiesRes || [];
+            console.debug('[CourseGradeDetail] ACTIVITIES fallback response count:', Array.isArray(acts) ? acts.length : 0);
+
+            // For each activity, fetch the student's grade row via the activity-grades query endpoint
+            const populated: any[] = [];
+            for (const a of acts) {
+              try {
+                const gradesUrl = `${API_ENDPOINTS.ACTIVITY_GRADES_BY_PARAMS}?activity_id=${encodeURIComponent(a.id)}&student_id=${encodeURIComponent(student.id)}`;
+                console.debug('[CourseGradeDetail] Fetching activity grades for activity:', a.id, gradesUrl);
+                const gres = await apiGet(gradesUrl);
+                const grows = gres.data || gres || [];
+                const studentGradeRow = Array.isArray(grows) && grows.length > 0 ? grows[0] : null;
+                const merged = { ...a, student_grade: studentGradeRow ? (studentGradeRow.grade ?? studentGradeRow.student_grade ?? studentGradeRow.score ?? null) : null };
+                populated.push(merged);
+              } catch (err) {
+                console.warn('[CourseGradeDetail] Failed to fetch activity grades for', a.id, err);
+                populated.push({ ...a, student_grade: null });
+              }
+            }
+
+            activitiesWithGrades = populated;
+          } catch (err) {
+            console.error('Failed to fetch activities fallback:', err);
+            activitiesWithGrades = [];
+          }
         }
 
         // 5) Map academic_period_id to period info for each activity

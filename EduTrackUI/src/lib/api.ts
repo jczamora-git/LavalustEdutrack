@@ -49,6 +49,7 @@ export const API_ENDPOINTS = {
   ACTIVITIES: `${API_BASE_URL}/api/activities`,
   ACTIVITY_BY_ID: (id: string | number) => `${API_BASE_URL}/api/activities/${id}`,
   ACTIVITY_GRADES: (id: string | number) => `${API_BASE_URL}/api/activities/${id}/grades`,
+  ACTIVITY_GRADES_BY_PARAMS: `${API_BASE_URL}/api/activity-grades`,
   ACTIVITIES_STUDENT_GRADES: `${API_BASE_URL}/api/activities/student-grades`,
   ACTIVITIES_STUDENT_ALL: `${API_BASE_URL}/api/activities/student-all`,
   EXPORT_CLASS_RECORD: `${API_BASE_URL}/api/activities/export-class-record`,
@@ -65,6 +66,22 @@ export const API_ENDPOINTS = {
   // Campuses (location for attendance)
   CAMPUSES: `${API_BASE_URL}/api/campuses`,
   CAMPUS_BY_ID: (id: string | number) => `${API_BASE_URL}/api/campuses/${id}`,
+  // Announcements
+  ANNOUNCEMENTS: `${API_BASE_URL}/api/announcements`,
+  ANNOUNCEMENT_BY_ID: (id: string | number) => `${API_BASE_URL}/api/announcements/${id}`,
+  // Attendance
+  ATTENDANCE_MARK: `${API_BASE_URL}/api/attendance/mark`,
+  ATTENDANCE_STUDENT: (id: string | number) => `${API_BASE_URL}/api/attendance/student/${id}`,
+  ATTENDANCE_COURSE: (id: string | number) => `${API_BASE_URL}/api/attendance/course/${id}`,
+  
+  // Final Grades
+  FINAL_GRADES: `${API_BASE_URL}/api/final-grades`,
+  FINAL_GRADES_SUBMIT: `${API_BASE_URL}/api/final-grades/submit`,
+
+  // PDF Reports
+  REPORTS_STUDENTS: `${API_BASE_URL}/api/reports/students`,
+  REPORTS_STUDENT_PDF: (id: string | number) => `${API_BASE_URL}/api/reports/student/${id}/pdf`,
+  REPORTS_BULK_PDF: `${API_BASE_URL}/api/reports/bulk/pdf`,
 };
 
 // API helper functions

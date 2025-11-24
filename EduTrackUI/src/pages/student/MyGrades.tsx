@@ -28,18 +28,55 @@ const MyGrades = () => {
       setLoading(true);
 
       try {
-        // 1) Fetch student to get section_id and year_level
+        // 1) Fetch student info to get year_level and section_id
         const studentRes = await apiGet(API_ENDPOINTS.STUDENT_BY_USER(user.id));
         const student = studentRes.data || studentRes.student || studentRes || null;
-        const sectionId = student?.section_id ?? student?.sectionId ?? null;
-
-        if (!student || !sectionId) {
+        
+        if (!student) {
+          console.error('Student record not found for user:', user.id);
           setCourses([]);
           setLoading(false);
           return;
         }
 
-        // 2) Fetch all academic periods (to get midterm/finalterm for current year)
+        // Normalize year_level to numeric value (supports '2nd Year', '2', or 2)
+        let studentYearLevelNum: number | null = null;
+        const studentYearLevelRaw = student.year_level ?? student.yearLevel;
+        if (typeof studentYearLevelRaw === 'number') studentYearLevelNum = studentYearLevelRaw;
+        else if (typeof studentYearLevelRaw === 'string') {
+          const m = String(studentYearLevelRaw).match(/(\d+)/);
+          studentYearLevelNum = m ? Number(m[1]) : null;
+        }
+
+        const studentSectionId = student.section_id || student.sectionId;
+
+        // 2) Fetch active academic period to determine current semester
+        let activePeriod: any = null;
+        try {
+          const activePeriodRes = await apiGet(`${API_ENDPOINTS.ACADEMIC_PERIODS_ACTIVE}-public`);
+          activePeriod = activePeriodRes.data || activePeriodRes.period || activePeriodRes || null;
+        } catch (err) {
+          console.warn('Failed to fetch active period from public endpoint, trying authenticated endpoint', err);
+          try {
+            const activePeriodRes = await apiGet(API_ENDPOINTS.ACADEMIC_PERIODS_ACTIVE);
+            activePeriod = activePeriodRes.data || activePeriodRes.period || activePeriodRes || null;
+          } catch (err2) {
+            console.error('Failed to fetch active period', err2);
+          }
+        }
+        
+        if (!activePeriod) {
+          console.warn('No active academic period found');
+          setCourses([]);
+          setLoading(false);
+          return;
+        }
+
+        // Extract semester from active period (e.g., "1st Semester" -> "1st")
+        const semesterMatch = (activePeriod.semester || '').match(/^(\d+)(st|nd|rd|th)/i);
+        const currentSemesterShort = semesterMatch ? (String(semesterMatch[1]) === '1' ? '1st' : '2nd') : null;
+
+        // 3) Fetch all academic periods (to find midterm/finalterm for current year/semester)
         let allPeriods: any[] = [];
         try {
           const periodsRes = await apiGet(API_ENDPOINTS.ACADEMIC_PERIODS);
@@ -48,58 +85,147 @@ const MyGrades = () => {
           console.warn('Failed to fetch academic periods', err);
         }
 
-        // 3) Get current active period to determine which periods to show
-        let activePeriod: any = null;
-        try {
-          const activeRes = await apiGet(`${API_ENDPOINTS.ACADEMIC_PERIODS_ACTIVE}-public`);
-          activePeriod = activeRes.data || activeRes.period || activeRes || null;
-        } catch (err) {
+        // 4) Fetch subjects using student-accessible endpoint with year_level and semester filtering
+        const subjectsQueryBase = new URLSearchParams();
+        if (studentYearLevelNum) subjectsQueryBase.set('year_level', String(studentYearLevelNum));
+
+        let subjects: any[] = [];
+        const semesterCandidates: (string | null)[] = [];
+        if (currentSemesterShort) {
+          semesterCandidates.push(currentSemesterShort);
+          semesterCandidates.push(currentSemesterShort.startsWith('1') ? '1' : '2');
+        } else {
+          semesterCandidates.push(null);
+        }
+
+        // Try server-side filtered fetches with different semester representations
+        let fetched = false;
+        for (const sem of semesterCandidates) {
           try {
-            const activeRes = await apiGet(API_ENDPOINTS.ACADEMIC_PERIODS_ACTIVE);
-            activePeriod = activeRes.data || activeRes.period || activeRes || null;
-          } catch (err2) {
-            console.warn('Failed to fetch active period', err2);
+            const params = new URLSearchParams(subjectsQueryBase.toString());
+            if (sem) params.set('semester', sem);
+            console.debug('Trying subjects fetch with params:', params.toString());
+            const subjectsRes = await apiGet(`${API_ENDPOINTS.SUBJECTS_FOR_STUDENT}?${params.toString()}`);
+            const rows = subjectsRes.data || subjectsRes.subjects || subjectsRes || [];
+            if (Array.isArray(rows) && rows.length > 0) {
+              subjects = rows;
+              fetched = true;
+              break;
+            }
+          } catch (err) {
+            console.warn('Subjects fetch failed for semester', sem, err);
           }
         }
 
-        // 4) Get teacher assignments for this section (which have subject info)
-        let taRows: any[] = [];
-        try {
-          const taRes = await apiGet(`${API_ENDPOINTS.TEACHER_ASSIGNMENTS_FOR_STUDENT}?section_id=${sectionId}`);
-          taRows = taRes.data || taRes.assignments || [];
-        } catch (err) {
-          console.warn('Failed to fetch teacher assignments', err);
+        // Fallback: try without semester
+        if (!fetched) {
+          try {
+            const params = new URLSearchParams();
+            if (studentYearLevelNum) params.set('year_level', String(studentYearLevelNum));
+            console.debug('Trying subjects fetch without semester:', params.toString());
+            const subjectsRes = await apiGet(`${API_ENDPOINTS.SUBJECTS_FOR_STUDENT}?${params.toString()}`);
+            const rows = subjectsRes.data || subjectsRes.subjects || subjectsRes || [];
+            if (Array.isArray(rows)) subjects = rows;
+          } catch (err) {
+            console.error('Failed to fetch subjects fallback', err);
+            subjects = [];
+          }
         }
 
-        // 5) Bulk-fetch activities for the relevant academic periods (reduces many requests)
-        // Determine needed period IDs (midterm/finalterm) per course, aggregate unique IDs
-        const courseMeta = taRows.map((ta: any) => {
-          const courseId = ta?.id ?? ta?.teacher_subject_id ?? null;
-          const subject = ta?.subject || {};
-          const subjectId = subject.id || ta?.subject_id;
-          const courseName = subject.course_code || subject.code || 'N/A';
-          const courseTitle = subject.course_name || subject.title || 'Untitled';
-          const courseSchoolYear = activePeriod?.school_year || '2025-2026';
-          const courseSemester = subject.semester || activePeriod?.semester || '1st Semester';
+        // 5) Fetch teacher assignments to get teacher info for each subject
+        let teacherAssignments: any[] = [];
+        if (studentSectionId) {
+          try {
+            const taRes = await apiGet(`${API_ENDPOINTS.TEACHER_ASSIGNMENTS_FOR_STUDENT}?section_id=${encodeURIComponent(studentSectionId)}`);
+            teacherAssignments = taRes.data || taRes.assignments || taRes || [];
+          } catch (err) {
+            console.warn('Failed to fetch teacher assignments for student endpoint, trying fallback', err);
+            try {
+              const taRes = await apiGet(API_ENDPOINTS.TEACHER_ASSIGNMENTS);
+              teacherAssignments = taRes.data || taRes.assignments || taRes || [];
+            } catch (err2) {
+              console.warn('Fallback teacher assignments fetch also failed', err2);
+            }
+          }
+        }
 
-          const midtermPeriod = allPeriods.find(
-            (p: any) => p.school_year === courseSchoolYear && p.semester === courseSemester && p.period_type === 'Midterm'
-          );
-          const finaltermPeriod = allPeriods.find(
-            (p: any) => p.school_year === courseSchoolYear && p.semester === courseSemester && p.period_type === 'Final Term'
-          );
+        // Build a lookup map from subjectId+sectionId => teacher info
+        const teacherMap = new Map<string, any>();
+        if (Array.isArray(teacherAssignments)) {
+          teacherAssignments.forEach((ta: any) => {
+            const subjId = ta?.subject?.id ?? ta?.subject_id ?? ta?.subjectId ?? null;
+            const teacherObj = {
+              id: ta?.teacher_id ?? ta?.teacher?.id ?? null,
+              first_name: ta?.teacher?.first_name ?? ta?.teacher?.firstName ?? null,
+              last_name: ta?.teacher?.last_name ?? ta?.teacher?.lastName ?? null,
+              name: ta?.teacher_name ?? (ta?.teacher?.first_name && ta?.teacher?.last_name ? `${ta.teacher.first_name} ${ta.teacher.last_name}` : null)
+            };
 
-          return { courseId, subjectId, courseName, courseTitle, midtermPeriod, finaltermPeriod, ta };
+            const sections = ta?.sections ?? [];
+            if (Array.isArray(sections) && sections.length > 0) {
+              sections.forEach((s: any) => {
+                const sid = s?.id ?? s?.section_id ?? s ?? null;
+                if (subjId != null && sid != null) {
+                  teacherMap.set(`${subjId}_${sid}`, teacherObj);
+                }
+              });
+            } else if (subjId != null) {
+              teacherMap.set(`${subjId}_*`, teacherObj);
+            }
+          });
+        }
+
+        // 6) Build course objects from subjects with teacher info
+        const coursesList = (Array.isArray(subjects) ? subjects : []).map((subject: any) => {
+          const subjId = subject?.id ?? subject?.subject_id ?? null;
+          let teacherObj = null;
+
+          if (subjId != null) {
+            if (studentSectionId) {
+              teacherObj = teacherMap.get(`${subjId}_${studentSectionId}`) || teacherMap.get(`${subjId}_*`);
+            }
+
+            if (!teacherObj) {
+              for (const [key, val] of teacherMap.entries()) {
+                if (key.startsWith(`${subjId}_`)) { teacherObj = val; break; }
+              }
+            }
+          }
+
+          const teacherName = teacherObj?.name ?? (teacherObj?.first_name && teacherObj?.last_name ? `${teacherObj.first_name} ${teacherObj.last_name}` : 'TBA');
+          const teacherId = teacherObj?.id ?? null;
+
+          return {
+            id: subject.id,
+            title: subject.course_name || subject.title || subject.name || 'Untitled Course',
+            code: subject.course_code || subject.code || 'N/A',
+            teacher: teacherName,
+            teacherId: teacherId,
+            section: student.section_name || studentSectionId || 'N/A',
+            credits: subject.units || subject.credits || 3,
+            semester: subject.semester || currentSemesterShort || 'N/A',
+            yearLevel: subject.year_level ?? subject.yearLevel ?? studentYearLevelRaw ?? 'N/A',
+            subjectId: subjId
+          };
         });
 
-        // Collect unique period IDs to fetch once per period
-        const periodIdSet = new Set<number>();
-        for (const cm of courseMeta) {
-          if (cm.midtermPeriod?.id) periodIdSet.add(cm.midtermPeriod.id);
-          if (cm.finaltermPeriod?.id) periodIdSet.add(cm.finaltermPeriod.id);
-        }
+        // 7) Fetch academic periods and build grade-period mappings per course
+        // Find midterm/finalterm for current school year and semester
+        const courseSchoolYear = activePeriod?.school_year || '2025-2026';
+        const courseSemester = activePeriod?.semester || '1st Semester';
 
-        // Bulk fetch activities for each period (one request per unique period)
+        const midtermPeriod = allPeriods.find(
+          (p: any) => p.school_year === courseSchoolYear && p.semester === courseSemester && p.period_type === 'Midterm'
+        );
+        const finaltermPeriod = allPeriods.find(
+          (p: any) => p.school_year === courseSchoolYear && p.semester === courseSemester && p.period_type === 'Final Term'
+        );
+
+        // 8) Bulk-fetch activities for the relevant academic periods
+        const periodIdSet = new Set<number>();
+        if (midtermPeriod?.id) periodIdSet.add(midtermPeriod.id);
+        if (finaltermPeriod?.id) periodIdSet.add(finaltermPeriod.id);
+
         const activitiesByPeriod: Record<number, any[]> = {};
         for (const pid of Array.from(periodIdSet)) {
           try {
@@ -111,20 +237,35 @@ const MyGrades = () => {
           }
         }
 
-        // Compute grades per course using the bulk-fetched activities
-        const coursesWithGrades = courseMeta.map((cm: any) => {
+        // 9) Compute grades per course using bulk-fetched activities
+        const coursesWithGrades = coursesList.map((course: any) => {
           const computeGradeFromActivities = (acts: any[] | undefined) => {
             if (!acts || acts.length === 0) return null;
             let totalScore = 0;
             let totalMaxScore = 0;
+
+            // match activities to course by checking multiple possible id fields
+            const courseIdsToMatch = [course.subjectId, course.id].filter((v) => v !== undefined && v !== null).map(String);
+
             for (const a of acts) {
-              if (String(a.course_id) !== String(cm.subjectId)) continue;
-              const g = a.student_grade;
+              const actIdCandidates = [
+                a.course_id,
+                a.subject_id,
+                a.teacher_subject_id,
+                a.subject?.id,
+                a.course?.id
+              ].filter((v) => v !== undefined && v !== null).map(String);
+
+              const matched = actIdCandidates.some((id) => courseIdsToMatch.includes(id));
+              if (!matched) continue;
+
+              const g = a.student_grade ?? a.grade ?? a.score ?? null;
               if (g !== null && g !== undefined) {
                 totalScore += Number(g);
-                totalMaxScore += Number(a.max_score ?? 100);
+                totalMaxScore += Number(a.max_score ?? a.maxScore ?? 100);
               }
             }
+
             if (totalMaxScore > 0) {
               const percentage = Math.round((totalScore / totalMaxScore) * 100);
               return { score: totalScore, maxScore: totalMaxScore, percentage };
@@ -132,17 +273,17 @@ const MyGrades = () => {
             return null;
           };
 
-          const midTermActs = cm.midtermPeriod?.id ? activitiesByPeriod[cm.midtermPeriod.id] : [];
-          const finalTermActs = cm.finaltermPeriod?.id ? activitiesByPeriod[cm.finaltermPeriod.id] : [];
+          const midTermActs = midtermPeriod?.id ? activitiesByPeriod[midtermPeriod.id] : [];
+          const finalTermActs = finaltermPeriod?.id ? activitiesByPeriod[finaltermPeriod.id] : [];
 
           const midtermGrade = computeGradeFromActivities(midTermActs);
           const finaltermGrade = computeGradeFromActivities(finalTermActs);
 
           return {
-            id: cm.courseId,
-            code: cm.courseName,
-            title: cm.courseTitle,
-            teacher: cm.ta?.teacher?.first_name && cm.ta?.teacher?.last_name ? `${cm.ta.teacher.first_name} ${cm.ta.teacher.last_name}` : 'N/A',
+            id: course.id,
+            code: course.code,
+            title: course.title,
+            teacher: course.teacher,
             midtermGrade,
             finaltermGrade,
             overallGrade: midtermGrade && finaltermGrade ? Math.round(((midtermGrade.percentage + finaltermGrade.percentage) / 2)) : midtermGrade?.percentage || finaltermGrade?.percentage || 0

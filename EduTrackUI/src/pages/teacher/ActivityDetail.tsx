@@ -549,9 +549,13 @@ const ActivityDetail = () => {
 
                   return (
                     <div role="progressbar" aria-label={ariaLabel} aria-valuetext={ariaValueText} className="w-full h-2 flex">
-                      {passedPct > 0 && <div className="h-full bg-green-500 transition-all duration-200" style={{ width: `${passedPct}%` }} />}
-                      {failedPct > 0 && <div className="h-full bg-red-500 transition-all duration-200" style={{ width: `${failedPct}%` }} />}
-                      {pendingPct > 0 && <div className="h-full bg-amber-500 transition-all duration-200" style={{ width: `${pendingPct}%` }} />}
+                          {/* inline width styles are intentionally used for dynamic progress segments */}
+                          {/* eslint-disable-next-line react/no-inline-styles */}
+                          {passedPct > 0 && <div className="h-full bg-green-500 transition-all duration-200" style={{ width: `${passedPct}%` }} />}
+                          {/* eslint-disable-next-line react/no-inline-styles */}
+                          {failedPct > 0 && <div className="h-full bg-red-500 transition-all duration-200" style={{ width: `${failedPct}%` }} />}
+                          {/* eslint-disable-next-line react/no-inline-styles */}
+                          {pendingPct > 0 && <div className="h-full bg-amber-500 transition-all duration-200" style={{ width: `${pendingPct}%` }} />}
                     </div>
                   );
                 })()}

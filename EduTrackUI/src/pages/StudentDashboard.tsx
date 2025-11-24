@@ -6,9 +6,14 @@ import { Badge } from "@/components/ui/badge";
 import { BookOpen, Bell, Award, TrendingUp, LogOut } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { DashboardLayout } from "@/components/DashboardLayout";
+import { API_ENDPOINTS, apiGet } from "@/lib/api";
+import { useNotificationContext } from "@/context/NotificationContext";
+import { NotificationBell } from "@/components/NotificationBell";
+import { useEffect } from "react";
 
 const StudentDashboard = () => {
   const { user } = useAuth();
+  const { notifications, addNotification } = useNotificationContext();
   const courses = [
     { id: 1, name: "Mathematics 101", teacher: "Dr. Smith", grade: 92, progress: 75, status: "active" },
     { id: 2, name: "Physics 201", teacher: "Prof. Johnson", grade: 88, progress: 60, status: "active" },
@@ -21,10 +26,59 @@ const StudentDashboard = () => {
     { activity: "Programming Project", course: "Computer Science", grade: 98, date: "2025-01-10" },
   ];
 
-  const notifications = [
+  const sidebarNotifications = [
     { id: 1, message: "New assignment posted in Mathematics 101", time: "2 hours ago" },
     { id: 2, message: "Grade updated for Physics Lab Report", time: "1 day ago" },
   ];
+
+  // Fetch announcements and add to global notifications (once)
+  useEffect(() => {
+    let mounted = true;
+    const loadAnnouncements = async () => {
+      try {
+        const res = await apiGet(API_ENDPOINTS.ANNOUNCEMENTS);
+        const list = res.data ?? res.announcements ?? res ?? [];
+
+        const existingMsg = new Set(sidebarNotifications.map((n: any) => n.message));
+        const existingIds = new Set<string | number>();
+        // Include already-added global notification sourceIds and messages
+        notifications.forEach((n: any) => {
+          if (n.sourceId) existingIds.add(String(n.sourceId));
+          if (n.message) existingMsg.add(n.message);
+        });
+
+        const matchesAudience = (aud: string | null | undefined) => {
+          const role = user?.role ?? '';
+          if (!aud) return true;
+          const a = String(aud).toLowerCase();
+          if (a === 'all') return true;
+          if (role === 'student' && (a === 'students' || a === 'student')) return true;
+          if (role === 'teacher' && (a === 'teachers' || a === 'teacher')) return true;
+          if (role === 'admin') return true;
+          return false;
+        };
+
+        (Array.isArray(list) ? list : []).forEach((a: any) => {
+          if (!mounted) return;
+          if (!matchesAudience(a.audience)) return;
+          const msg = a.title ? `${a.title}: ${a.message ?? ''}` : (a.message ?? '');
+          const sid = a.id ?? a._id ?? null;
+          if (sid && existingIds.has(String(sid))) return; // already added
+          if (!sid && existingMsg.has(msg)) return; // dedupe by message if no id
+
+          // attach full announcement as meta and keep it persistent
+          addNotification({ type: 'info', message: msg, duration: 0, meta: a, sourceId: sid, displayToast: false });
+          if (sid) existingIds.add(String(sid));
+          existingMsg.add(msg);
+        });
+      } catch (e) {
+        // ignore fetch errors on dashboard
+      }
+    };
+
+    loadAnnouncements();
+    return () => { mounted = false; };
+  }, []);
 
   return (
     <DashboardLayout>
@@ -38,6 +92,7 @@ const StudentDashboard = () => {
             <Badge variant="secondary">Student</Badge>
           </div>
           <div className="flex items-center gap-4">
+            <NotificationBell />
             <div className="text-right">
               <p className="text-sm font-medium">{user?.name}</p>
             </div>
@@ -160,10 +215,10 @@ const StudentDashboard = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                {notifications.map((notification) => (
-                  <div key={notification.id} className="p-3 bg-muted rounded-lg">
+                {(sidebarNotifications.concat(notifications as any)).slice(0,6).map((notification: any, idx: number) => (
+                  <div key={notification.id ?? idx} className="p-3 bg-muted rounded-lg">
                     <p className="text-sm mb-1">{notification.message}</p>
-                    <p className="text-xs text-muted-foreground">{notification.time}</p>
+                    <p className="text-xs text-muted-foreground">{notification.time ?? (notification.timestamp ? new Date(notification.timestamp).toLocaleString() : '')}</p>
                   </div>
                 ))}
               </CardContent>

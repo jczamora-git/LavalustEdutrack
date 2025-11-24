@@ -82,7 +82,7 @@ $autoload['libraries'] = array('database','session');
 |
 |	$autoload['helpers'] = array('url', 'file');
 */
-$autoload['helpers'] = array('url','api','spreadsheet','mail','email_templates','classrecord','classrecord_excel');
+$autoload['helpers'] = array('url','api','spreadsheet','mail','email_templates','classrecord','classrecord_excel','pdf');
 
 /*
 | -------------------------------------------------------------------
@@ -103,7 +103,11 @@ $autoload['models'] = array('UserModel',
                     'StudentSubjectModel',
                     'ActivityModel',
                     'AcademicPeriodModel',
-                    'CampusModel',);
+                    'CampusModel',
+                    'AnnouncementModel',
+                    'FinalGradesModel',
+                    'AttendanceModel'
+                    );
 
 /*
 | -------------------------------------------------------------------

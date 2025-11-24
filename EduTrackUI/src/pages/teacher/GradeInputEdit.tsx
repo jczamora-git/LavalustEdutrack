@@ -132,7 +132,7 @@ const GradeInputEdit = () => {
         const courseList = courseRes.assigned_courses ?? courseRes.data ?? courseRes.assignments ?? courseRes ?? [];
         if (mounted && Array.isArray(courseList)) {
           setCourses(courseList);
-          const foundCourse = courseList.find((c: any) => String(c.id ?? c.subject_id ?? c.teacher_subject_id) === String(selectedCourse));
+          const foundCourse = courseList.find((c: any) => String((c.subject && c.subject.id) ?? c.subject_id ?? c.subject?.subject_id ?? c.id ?? c.teacher_subject_id) === String(selectedCourse));
           if (foundCourse) {
             const section = Array.isArray(foundCourse.sections) 
               ? foundCourse.sections.find((s: any) => String(s.id ?? s.section_id) === String(selectedSection))
@@ -160,7 +160,7 @@ const GradeInputEdit = () => {
         }
 
         // Fetch students with grades
-        const course = courseList.find((c: any) => String(c.id ?? c.subject_id ?? c.teacher_subject_id) === String(selectedCourse));
+        const course = courseList.find((c: any) => String((c.subject && c.subject.id) ?? c.subject_id ?? c.subject?.subject_id ?? c.id ?? c.teacher_subject_id) === String(selectedCourse));
         const yearLevel = course?.year_level ?? null;
 
         let query = `section_id=${encodeURIComponent(String(selectedSection))}`;

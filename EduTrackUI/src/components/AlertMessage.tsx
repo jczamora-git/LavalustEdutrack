@@ -15,8 +15,11 @@ export const AlertMessage = ({
   duration = 3000,
 }: AlertMessageProps) => {
   useEffect(() => {
-    const timer = setTimeout(onClose, duration);
-    return () => clearTimeout(timer);
+    if (duration && duration > 0) {
+      const timer = setTimeout(onClose, duration);
+      return () => clearTimeout(timer);
+    }
+    // duration === 0 means persistent: do not set a timer
   }, [onClose, duration]);
 
   const bgColor = {

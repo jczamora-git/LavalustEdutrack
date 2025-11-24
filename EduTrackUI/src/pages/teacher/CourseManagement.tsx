@@ -40,6 +40,7 @@ const CourseManagement = () => {
   const [courseYearLevel, setCourseYearLevel] = useState<number | string | null>(null);
   const [selectedSectionId, setSelectedSectionId] = useState<string | null>(null);
   const [sections, setSections] = useState<Array<{ id: string | number; name: string }>>([]);
+  const [canonicalCourseId, setCanonicalCourseId] = useState<string | number | null>(null);
 
   useEffect(() => {
     if (!isAuthenticated || user?.role !== "teacher") {
@@ -87,6 +88,13 @@ const CourseManagement = () => {
   const [newType, setNewType] = useState("");
   const [newMaxScore, setNewMaxScore] = useState<string>("");
   const [newDueDate, setNewDueDate] = useState("");
+  // Edit activity state
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [editActivityId, setEditActivityId] = useState<number | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editType, setEditType] = useState("");
+  const [editMaxScore, setEditMaxScore] = useState<string>("");
+  const [editDueDate, setEditDueDate] = useState("");
   const [alert, setAlert] = useState<{ type: "success" | "error" | "info"; message: string } | null>(null);
   
 
@@ -200,7 +208,8 @@ const CourseManagement = () => {
             for (const a of assigned) {
               // a may have id (teacher_subject_id), teacher_subject_id, or subject_id
               const aId = a.id ?? a.teacher_subject_id ?? a.subject_id ?? null;
-              if (String(aId) === String(courseId) || String(a.subject_id) === String(courseId)) {
+              // Determine if this assignment corresponds to the route param (which may be teacher_subject_id)
+              if (String(aId) === String(courseId) || String(a.subject_id) === String(courseId) || String(a.teacher_subject_id) === String(courseId)) {
                 setCourseTitle(a.course_name ?? a.title ?? '');
                 setCourseCode(a.course_code ?? a.code ?? '');
                 // detect year_level from assignment if present
@@ -219,6 +228,9 @@ const CourseManagement = () => {
                             setSectionName(secs[0].name ?? null);
                           }
                 }
+                // Compute canonical course id (subject id) for activity API queries
+                const canonical = (a.subject && a.subject.id) ?? a.subject_id ?? a.subject?.subject_id ?? a.id ?? a.teacher_subject_id ?? null;
+                setCanonicalCourseId(canonical);
                 courseFound = true;
                 break;
               }
@@ -240,6 +252,8 @@ const CourseManagement = () => {
             // detect year_level from subject
             detectedYearLevel = detectedYearLevel ?? (s.year_level ?? s.yearLevel ?? s.year ?? null);
             if (detectedYearLevel) setCourseYearLevel(detectedYearLevel);
+            // If we fetched the subject directly, use its id as canonical
+            setCanonicalCourseId(s.id ?? s.subject_id ?? courseId);
           } catch (e) {}
         }
 
@@ -285,13 +299,14 @@ const CourseManagement = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [courseId, location.search]);
 
-  // Fetch activities for the course
+            // Fetch activities for the course
   useEffect(() => {
-    if (!courseId) return;
+    const effectiveCourseId = canonicalCourseId ?? courseId;
+    if (!effectiveCourseId) return;
     const fetchActivities = async () => {
       try {
         const q = new URLSearchParams();
-        q.set('course_id', String(courseId));
+        q.set('course_id', String(effectiveCourseId));
         if (selectedSectionId) q.set('section_id', String(selectedSectionId));
         const res = await apiGet(`${API_ENDPOINTS.ACTIVITIES}?${q.toString()}`);
         const actList = res.data ?? res.activities ?? [];
@@ -445,10 +460,13 @@ const CourseManagement = () => {
                           </button>
                         );
                       })}
+
+                      
+                      {/* Clear filter button (shown when categories selected) */}
                       {selectedCategories.length > 0 && (
                         <button onClick={() => setSelectedCategories([])} className="text-xs ml-2 text-muted-foreground underline">Clear</button>
                       )}
-                    </div>
+                        </div>
                   </div>
 
                   <div className="flex items-center gap-2">
@@ -466,6 +484,83 @@ const CourseManagement = () => {
                         <List className="h-4 w-4" />
                       )}
                     </Button>
+
+                    {/* Edit Activity Dialog (uses Create dialog UI for consistent styling) */}
+                    <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+                      <DialogContent className="max-w-2xl border-0 shadow-2xl rounded-2xl overflow-hidden p-0">
+                        <div className="px-8 py-6 bg-gradient-to-r from-blue-600 to-cyan-500 text-white">
+                          <div>
+                            <h3 className="text-2xl font-bold">Edit Activity</h3>
+                            <p className="text-sm font-medium opacity-95 mt-2">Update the details for this activity.</p>
+                            {selectedPeriod && selectedPeriod.status === 'active' && (
+                              <div className="mt-3 bg-white/20 backdrop-blur-sm rounded-lg px-3 py-2 border border-white/30">
+                                <p className="text-xs font-semibold opacity-90">Academic Period:</p>
+                                <p className="text-sm font-bold">
+                                  {selectedPeriod.school_year} - {selectedPeriod.semester} ({selectedPeriod.period_type})
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <div className="px-8 py-6 bg-white space-y-6">
+                          <div>
+                            <Label htmlFor="edit-activity-title">Activity Title</Label>
+                            <Input id="edit-activity-title" value={editTitle} onChange={(e) => setEditTitle(e.target.value)} placeholder="Enter activity title" />
+                          </div>
+                          <div>
+                            <Label htmlFor="edit-activity-type">Type</Label>
+                            <Select value={editType} onValueChange={(v) => setEditType(v)}>
+                              <SelectTrigger id="edit-activity-type">
+                                <SelectValue placeholder="Select type" />
+                              </SelectTrigger>
+                               <SelectContent>
+                                  <SelectItem value="assignment">Assignment</SelectItem>
+                                  <SelectItem value="quiz">Quiz</SelectItem>
+                                  <SelectItem value="exam">Exam</SelectItem>
+                                  <SelectItem value="project">Project</SelectItem>
+                                  <SelectItem value="laboratory">Laboratory</SelectItem>
+                                  <SelectItem value="performance">Performance</SelectItem>
+                                  <SelectItem value="other">Other</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <Label htmlFor="edit-max-score">Maximum Score</Label>
+                              <Input id="edit-max-score" type="number" value={editMaxScore} onChange={(e) => setEditMaxScore(e.target.value)} placeholder="100" />
+                            </div>
+                            <div>
+                              <Label htmlFor="edit-due-date">Due Date <span className="text-amber-600">*</span></Label>
+                              <Input id="edit-due-date" type="date" value={editDueDate} onChange={(e) => setEditDueDate(e.target.value)} />
+                            </div>
+                          </div>
+                          <div className="pt-2 flex items-center justify-end gap-3">
+                            <Button variant="outline" onClick={() => setIsEditOpen(false)}>Cancel</Button>
+                            <Button className="bg-gradient-to-r from-blue-600 to-cyan-500 text-white rounded-full" onClick={async () => {
+                              if (!editActivityId) return;
+                              if (!editTitle) { setAlert({ type: 'error', message: 'Title is required' }); return; }
+                              if (!editType) { setAlert({ type: 'error', message: 'Please select a category for the activity' }); return; }
+                              if (!editMaxScore || Number(editMaxScore) <= 0) { setAlert({ type: 'error', message: 'Please enter a valid maximum score (greater than 0)' }); return; }
+                              try {
+                                const payload: any = { title: editTitle, type: editType, max_score: Number(editMaxScore) || 0, due_at: editDueDate || null };
+                                const res = await apiPost(`${API_ENDPOINTS.ACTIVITIES}/${editActivityId}`, payload);
+                                if (res && res.success && res.data) {
+                                  const updated = res.data;
+                                  if (!updated.grading_stats) updated.grading_stats = activities.find((x) => x.id === editActivityId)?.grading_stats ?? { total: 0, graded: 0, pending: 0, percentage_graded: 0 };
+                                  setActivities((prev) => prev.map((a) => a.id === editActivityId ? ({ ...a, ...updated }) : a));
+                                  setIsEditOpen(false);
+                                  setAlert({ type: 'success', message: res.message ?? 'Activity updated' });
+                                } else {
+                                  setAlert({ type: 'error', message: res?.message ?? 'Failed to update activity' });
+                                }
+                              } catch (e) {
+                                setAlert({ type: 'error', message: e instanceof Error ? e.message : 'Error updating activity' });
+                              }
+                            }}>Save Changes</Button>
+                          </div>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
 
                     <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
                         <DialogTrigger asChild>
@@ -524,7 +619,8 @@ const CourseManagement = () => {
                           <div className="pt-2">
                             <Button className="w-full bg-gradient-to-r from-blue-600 to-cyan-500 text-white rounded-full" disabled={!newTitle || !newType || !newDueDate || !newMaxScore} onClick={async () => {
                               // validate
-                              if (!newTitle || !courseId) {
+                              const effectiveCourseId = canonicalCourseId ?? courseId;
+                              if (!newTitle || !effectiveCourseId) {
                                 setAlert({ type: 'error', message: 'Please fill in title and ensure course is loaded' });
                                 return;
                               }
@@ -549,7 +645,7 @@ const CourseManagement = () => {
 
                               try {
                                 const res = await apiPost(API_ENDPOINTS.ACTIVITIES, {
-                                  course_id: courseId,
+                                  course_id: effectiveCourseId,
                                   section_id: selectedSectionId,
                                   title: newTitle,
                                   type: newType,
@@ -659,6 +755,20 @@ const CourseManagement = () => {
                         >
                           View Details
                         </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setEditActivityId(activity.id);
+                            setEditTitle(activity.title ?? '');
+                            setEditType(activity.type ?? '');
+                            setEditMaxScore(String(activity.max_score ?? ''));
+                            setEditDueDate(activity.due_at ? String(activity.due_at).split(' ')[0] : '');
+                            setIsEditOpen(true);
+                          }}
+                        >
+                          Edit
+                        </Button>
                       </div>
                     </div>
                     );
@@ -721,6 +831,14 @@ const CourseManagement = () => {
                               )}
                             </div>
                             <Button size="sm" variant="ghost" onClick={() => navigate(`/teacher/courses/${courseId}/activities/${activity.id}${selectedSectionId ? `?section_id=${selectedSectionId}` : ''}`)}>View</Button>
+                              <Button size="sm" variant="outline" onClick={() => {
+                                setEditActivityId(activity.id);
+                                setEditTitle(activity.title ?? '');
+                                setEditType(activity.type ?? '');
+                                setEditMaxScore(String(activity.max_score ?? ''));
+                                setEditDueDate(activity.due_at ? String(activity.due_at).split(' ')[0] : '');
+                                setIsEditOpen(true);
+                              }}>Edit</Button>
                           </div>
                         </div>
                         );

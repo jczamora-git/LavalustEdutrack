@@ -6,9 +6,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Award, Save, Upload, Download, FileSpreadsheet, Edit3 } from "lucide-react";
+import { Award, Save, Upload, Download, FileSpreadsheet, Edit3, Send } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { API_ENDPOINTS, apiGet } from "@/lib/api";
+import { API_ENDPOINTS, apiGet, apiPost } from "@/lib/api";
 
 const GradeInput = () => {
   const { user, isAuthenticated } = useAuth();
@@ -34,7 +34,7 @@ const GradeInput = () => {
   const [sections, setSections] = useState<any[]>([]);
   const [students, setStudents] = useState<any[]>([]);
   const [activities, setActivities] = useState<any[]>([]);
-  const [loading, setLoading] = useState({ periods: false, courses: false, sections: false, students: false, activities: false });
+  const [loading, setLoading] = useState({ periods: false, courses: false, sections: false, students: false, activities: false, submitting: false });
 
   const [courseInfo, setCourseInfo] = useState({ code: "", title: "", teacher: "", section: "" });
 
@@ -265,6 +265,75 @@ const GradeInput = () => {
     alert("Grades saved successfully!");
   };
 
+  // Helper to convert transmuted grade to numeric equivalent
+  const getNumericFromGrade = (gradeStr: string): number => {
+    const gradeMap: Record<string, number> = {
+      '1.00': 97, '1.25': 94, '1.50': 91, '1.75': 88, '2.00': 85,
+      '2.25': 82, '2.50': 79, '2.75': 76, '3.00': 75, '5.00': 0
+    };
+    return gradeMap[gradeStr] || 0;
+  };
+
+  const handleSubmitGrades = async () => {
+    if (!selectedCourse || !selectedSection || !selectedPeriodId || !selectedTerm) {
+      alert("Please select a course, section, period, and term first");
+      return;
+    }
+
+    if (students.length === 0) {
+      alert("No students found for this course/section");
+      return;
+    }
+
+    const confirmSubmit = window.confirm(
+      `Are you sure you want to submit grades for ${students.length} students?\nThis will upload the final grades to the system.`
+    );
+
+    if (!confirmSubmit) return;
+
+    try {
+      setLoading((l) => ({ ...l, submitting: true }));
+
+      // Prepare grades payload
+      const gradesData = students.map((student) => {
+        const categorized = categorizeActivities(activities);
+        const calculatedGrades = calculateGrades(student.id, categorized);
+        const numericScore = getNumericFromGrade(calculatedGrades.finalGrade);
+        
+        return {
+          student_id: student.id,
+          final_grade_num: numericScore,
+          final_grade: calculatedGrades.finalGrade
+        };
+      });
+
+      const payload = {
+        subject_id: selectedCourse,
+        section_id: selectedSection,
+        academic_period_id: selectedPeriodId,
+        term: selectedTerm.charAt(0).toUpperCase() + selectedTerm.slice(1),
+        grades: gradesData
+      };
+
+      const response = await apiPost(API_ENDPOINTS.FINAL_GRADES_SUBMIT, payload);
+
+      if (response.success) {
+        alert(
+          `Grades submitted successfully!\n` +
+          `Inserted: ${response.inserted}, Updated: ${response.updated}` +
+          (response.errors && response.errors.length > 0 ? `\nErrors: ${response.errors.join('; ')}` : '')
+        );
+      } else {
+        alert(`Failed to submit grades: ${response.message}`);
+      }
+    } catch (error: any) {
+      console.error('Grade submission error:', error);
+      alert(`Error submitting grades: ${error.message}`);
+    } finally {
+      setLoading((l) => ({ ...l, submitting: false }));
+    }
+  };
+
   // Fetch academic periods and teacher assignments (courses) on mount
   useEffect(() => {
     let mounted = true;
@@ -309,12 +378,17 @@ const GradeInput = () => {
             const mapped = tlist.map((a: any) => {
               // Handle various response structures
               const subj = a.subject ?? a;
-              const courseId = a.teacher_subject_id ?? a.id ?? a.subject_id ?? subj.id ?? subj.subject_id;
+              // Prefer nested subject.id or flat subject_id when available.
+              // Many API shapes return either `assignments` (with nested `subject`) or
+              // `assigned_courses` (flat object where `id` is the teacher_subject id and
+              // `subject_id` is the canonical subject id). We prefer the canonical
+              // subject id to use as activities.course_id.
+              const courseId = (a.subject && a.subject.id) ?? a.subject_id ?? subj.subject_id ?? subj.id ?? a.teacher_subject_id ?? a.id;
               const courseCode = a.course_code ?? subj.course_code ?? subj.code ?? a.code;
               const courseName = a.course_name ?? subj.course_name ?? subj.title ?? subj.name;
               const semester = a.semester ?? subj.semester ?? null;
               const yearLevel = a.year_level ?? subj.year_level ?? null;
-              
+
               // Extract sections
               let sectionsList = [];
               if (Array.isArray(a.sections)) {
@@ -525,9 +599,11 @@ const GradeInput = () => {
         const list = res.data ?? res.students ?? res ?? [];
         if (mounted && Array.isArray(list)) {
           // Map backend student shape to UI student rows
+          // Use numeric DB `id` as the primary `id` for API calls, keep `student_code` for display
           const mapped = list.map((st: any) => {
             return {
-              id: st.student_id ?? st.id ?? st.user_id ?? String(st.id),
+              id: st.id ?? st.user_id ?? null,
+              student_code: st.student_id ?? null,
               name: st.name ?? `${st.first_name ?? ''} ${st.last_name ?? ''}`,
               email: st.email ?? st.user_email ?? '',
               status: st.status ?? 'active',
@@ -576,6 +652,14 @@ const GradeInput = () => {
             <Button onClick={handleSaveGrades}>
               <Save className="h-4 w-4 mr-2" />
               Save Changes
+            </Button>
+            <Button
+              onClick={handleSubmitGrades}
+              disabled={loading.submitting}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              <Send className="h-4 w-4 mr-2" />
+              {loading.submitting ? 'Submitting...' : 'Submit Grades'}
             </Button>
           </div>
         </div>
@@ -836,7 +920,7 @@ const GradeInput = () => {
                         <td className="p-2 sticky left-0 z-10 bg-background border-r border-border min-w-[200px] max-w-[200px] w-[200px]">
                           <div>
                             <p className="font-medium text-xs">{idx + 1}. {student.name}</p>
-                            <p className="text-[10px] text-muted-foreground">{student.id}</p>
+                            <p className="text-[10px] text-muted-foreground">{student.student_code ?? student.id}</p>
                           </div>
                         </td>
                         {/* Written Works - Individual Scores */}

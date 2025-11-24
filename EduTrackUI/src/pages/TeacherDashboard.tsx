@@ -5,11 +5,14 @@ import { Badge } from "@/components/ui/badge";
 import { BookOpen, Users, FileText, TrendingUp, LogOut, Plus, Clock, Award } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { DashboardLayout } from "@/components/DashboardLayout";
+import { NotificationBell } from "@/components/NotificationBell";
 import { useEffect, useState } from "react";
 import { API_ENDPOINTS, apiGet } from "@/lib/api";
+import { useNotificationContext } from "@/context/NotificationContext";
 
 const TeacherDashboard = () => {
   const { user } = useAuth();
+  const { notifications, addNotification } = useNotificationContext();
   
   // State for real data
   const [courses, setCourses] = useState<any[]>([]);
@@ -26,6 +29,52 @@ const TeacherDashboard = () => {
 
   useEffect(() => {
     fetchDashboardData();
+  }, []);
+
+  // Fetch announcements and seed global notifications
+  useEffect(() => {
+    let mounted = true;
+    const loadAnnouncements = async () => {
+      try {
+        const res = await apiGet(API_ENDPOINTS.ANNOUNCEMENTS);
+        const list = res.data ?? res.announcements ?? res ?? [];
+
+        const matchesAudience = (aud: string | null | undefined) => {
+          const role = user?.role ?? '';
+          if (!aud) return true;
+          const a = String(aud).toLowerCase();
+          if (a === 'all') return true;
+          if (role === 'student' && (a === 'students' || a === 'student')) return true;
+          if (role === 'teacher' && (a === 'teachers' || a === 'teacher')) return true;
+          if (role === 'admin') return true;
+          return false;
+        };
+
+        const existingMsg = new Set<string>();
+        const existingIds = new Set<string | number>();
+        notifications.forEach((n: any) => {
+          if (n.sourceId) existingIds.add(String(n.sourceId));
+          if (n.message) existingMsg.add(n.message);
+        });
+
+        (Array.isArray(list) ? list : []).forEach((a: any) => {
+          if (!mounted) return;
+          if (!matchesAudience(a.audience)) return;
+          const msg = a.title ? `${a.title}: ${a.message ?? ''}` : (a.message ?? '');
+          const sid = a.id ?? a._id ?? null;
+          if (sid && existingIds.has(String(sid))) return;
+          if (!sid && existingMsg.has(msg)) return;
+
+          addNotification({ type: 'info', message: msg, duration: 0, meta: a, sourceId: sid, displayToast: false });
+          if (sid) existingIds.add(String(sid));
+          existingMsg.add(msg);
+        });
+      } catch (e) {
+        // ignore
+      }
+    };
+    loadAnnouncements();
+    return () => { mounted = false; };
   }, []);
 
   const fetchDashboardData = async () => {
@@ -327,6 +376,7 @@ const TeacherDashboard = () => {
             <Badge className="bg-accent text-accent-foreground">Teacher</Badge>
           </div>
           <div className="flex items-center gap-4">
+            <NotificationBell />
             <div className="text-right">
               <p className="text-sm font-medium">{user?.name}</p>
             </div>

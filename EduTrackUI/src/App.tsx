@@ -7,6 +7,8 @@ import { ThemeProvider } from "next-themes";
 import { AuthProvider } from "./hooks/useAuth";
 import { ConfirmProvider } from "@/components/Confirm";
 import { ProtectedRoute } from "./components/ProtectedRoute";
+import { NotificationProvider } from "@/context/NotificationContext";
+import { NotificationContainer } from "@/components/NotificationContainer";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import ForgotPassword from "./pages/ForgotPassword";
@@ -53,7 +55,8 @@ import MyGrades from "./pages/student/MyGrades";
 import MyProgress from "./pages/student/MyProgress";
 import CourseGradeDetail from "./pages/student/CourseGradeDetail";
 import StudentSettings from "./pages/student/StudentSettings";
-import AttendanceQR from "./pages/student/AttendanceQR";
+import AttendanceQR from "./pages/teacher/AttendanceQR";
+import StudentAttendanceQR from "./pages/student/AttendanceQR";
 
 const queryClient = new QueryClient();
 
@@ -68,10 +71,12 @@ const App = () => (
       <TooltipProvider>
         <Toaster />
         <Sonner />
-        <BrowserRouter>
-          <AuthProvider>
-          <ConfirmProvider>
-          <Routes>
+        <NotificationProvider>
+          <BrowserRouter>
+            <AuthProvider>
+              <ConfirmProvider>
+                <NotificationContainer />
+                <Routes>
             <Route path="/" element={<Auth />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/auth/forgot-password" element={<ForgotPassword />} />
@@ -87,7 +92,7 @@ const App = () => (
             <Route path="/student/course-grade-detail/:courseId" element={<ProtectedRoute requiredRole="student"><CourseGradeDetail /></ProtectedRoute>} />
             <Route path="/student/settings" element={<ProtectedRoute requiredRole="student"><StudentSettings /></ProtectedRoute>} />
             <Route path="/student/courses/:courseId" element={<ProtectedRoute requiredRole="student"><CourseDetails /></ProtectedRoute>} />
-            <Route path="/student/attendance-qr" element={<ProtectedRoute requiredRole="student"><AttendanceQR /></ProtectedRoute>} />
+            <Route path="/student/attendance-qr" element={<ProtectedRoute requiredRole="student"><StudentAttendanceQR /></ProtectedRoute>} />
             
             {/* Teacher Routes */}
             <Route path="/teacher/dashboard" element={<ProtectedRoute requiredRole="teacher"><TeacherDashboard /></ProtectedRoute>} />
@@ -99,6 +104,7 @@ const App = () => (
             <Route path="/teacher/grades" element={<ProtectedRoute requiredRole="teacher"><GradeInput /></ProtectedRoute>} />
             <Route path="/teacher/grade-input-edit" element={<ProtectedRoute requiredRole="teacher"><GradeInputEdit /></ProtectedRoute>} />
             <Route path="/teacher/settings" element={<ProtectedRoute requiredRole="teacher"><TeacherSettings /></ProtectedRoute>} />
+            <Route path="/teacher/attendance-qr" element={<ProtectedRoute requiredRole="teacher"><AttendanceQR /></ProtectedRoute>} />
             <Route path="/teacher/courses/:courseId" element={<ProtectedRoute requiredRole="teacher"><CourseManagement /></ProtectedRoute>} />
             
             {/* Admin Routes */}
@@ -125,11 +131,12 @@ const App = () => (
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
-      </ConfirmProvider>
-      </AuthProvider>
-      </BrowserRouter>
-    </TooltipProvider>
-  </ThemeProvider>
+              </ConfirmProvider>
+            </AuthProvider>
+          </BrowserRouter>
+        </NotificationProvider>
+      </TooltipProvider>
+    </ThemeProvider>
   </QueryClientProvider>
 );
 
